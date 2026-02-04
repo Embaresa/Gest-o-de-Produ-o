@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="description" content="Gestão de Produção - Embaresa PT">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Produção - Embaresa PT</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; min-height: 100vh; }
+        input, select, button, textarea { font-size: 16px !important; font-family: inherit; }
+        select { background: white; }
+        .btn { padding: 12px 20px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; }
+        .btn-secondary { background: #e2e8f0; color: #475569; }
+        .card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 15px; }
+        .input { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 12px; outline: none; }
+        .input:focus { border-color: #1e40af; }
+        .label { display: block; margin-bottom: 8px; font-weight: 600; color: #334155; font-size: 14px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .text-center { text-align: center; }
+        .mb-3 { margin-bottom: 15px; }
+        .mb-4 { margin-bottom: 20px; }
+        .mt-3 { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // ============================================================
+        // CONFIGURAÇÃO - URLs do Power Automate
+        // ============================================================
+        const CONFIG = {
+            URL_PRODUCAO: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7d6d064896034900976cdbe6fecbd809/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=o25Z-eFD68rkovgpItkF2MLL1wKINpkqRFsIZXBYWv8',
+            URL_PERTURBACOES: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/971c47b2c0f34fcb87a4d2915ec0b866/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jenqnDFyXmVuQjtfGbm6PF-gNDUoF-KTu-RJoAX25k4',
+            URL_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/5da3828d37564c2ba8af16ca06e2b7e0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=NRb520YI7wcDJjMufAfUzrlYIQSQ3ub6dl1KrQ3_FxI'
+        };
+
+        // ============================================================
+        // DADOS - Colaboradores
+        // ============================================================
+        const COLABORADORES = [
+            "Amílcar Manuel Monginho Barreto",
+            "André Avelino Tavares Rocha",
+            "David Alexandre Lopes Rocha",
+            "Fernando Garcia",
+            "Hugo José Ferreira da Silva",
+            "Joaquim Comenda",
+            "Nuno Rafael Pereira Franco",
+            "Pedro Miguel Serranito Familia",
+            "Rui Miguel Charrua Richáu",
+            "Valdir Tavares",
+            "William Chaves Inaba"
+        ];
+
+        // ============================================================
+        // DADOS - Artigos por tipo
+        // ============================================================
+        const ARTIGOS = [
+            { artigo: "E2-Lower Dir V2", tipo: "E2" },
+            { artigo: "E2-Lower Esq V2", tipo: "E2" },
+            { artigo: "E2-Upper Dir V2", tipo: "E2" },
+            { artigo: "E2-Upper Esq V2", tipo: "E2" },
+            { artigo: "E2- Cx1 Desc 4Metros", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 2", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 7", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 8", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 9", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 10", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 11", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 12", tipo: "E2-Frac" },
+            { artigo: "E2-Frac 22", tipo: "E2-Frac" },
+            { artigo: "KC 390-Lower Dir", tipo: "KC390" },
+            { artigo: "KC 390-Lower Esq", tipo: "KC390" },
+            { artigo: "KC 390-Upper Dir", tipo: "KC390" },
+            { artigo: "KC 390-Upper Esq", tipo: "KC390" },
+            { artigo: "KC 390 EV", tipo: "KC390" },
+            { artigo: "KC390-EH", tipo: "KC390" },
+            { artigo: "KC 390 Frac 2", tipo: "KC390-Frac" },
+            { artigo: "KC 390 Frac 4", tipo: "KC390-Frac" },
+            { artigo: "KC 390 Frac 6", tipo: "KC390-Frac" },
+            { artigo: "KC 390 Frac 13", tipo: "KC390-Frac" },
+            { artigo: "KC 390 Wing tip", tipo: "KC390-Frac" },
+            { artigo: "Praetor- Semi Asa Dir", tipo: "Praetor" },
+            { artigo: "Praetor- Semi Asa Esq", tipo: "Praetor" },
+            { artigo: "Praetor EH", tipo: "Praetor" },
+            { artigo: "Praetor EV", tipo: "Praetor" },
+            { artigo: "Praetor TC", tipo: "Praetor" },
+            { artigo: "E1-Embalagem A", tipo: "E1" },
+            { artigo: "E1-Embalagem F", tipo: "E1" },
+            { artigo: "E1-Embalagem G", tipo: "E1" },
+            { artigo: "E1-Embalagem NMF", tipo: "E1" },
+            { artigo: "Cxs sobras reforçadas", tipo: "Maquinacao" },
+            { artigo: "Cxs sobras tipo jaula 1600*1200*800", tipo: "Maquinacao" },
+            { artigo: "Cxs sobras tipo jaula 1600", tipo: "Maquinacao" },
+            { artigo: "Cxs sobras tipo jaula 1200", tipo: "Maquinacao" },
+            { artigo: "Transporte", tipo: "Transporte" }
+        ];
+
+        // ============================================================
+        // DADOS - Tipos/Programas
+        // ============================================================
+        const TIPOS = [
+            { id: "E2", nome: "E2", icon: "✈️" },
+            { id: "E2-Frac", nome: "E2 - Frações", icon: "📦" },
+            { id: "KC390", nome: "KC390", icon: "✈️" },
+            { id: "KC390-Frac", nome: "KC390 - Frações", icon: "📦" },
+            { id: "Praetor", nome: "Praetor", icon: "✈️" },
+            { id: "E1", nome: "E1", icon: "📦" },
+            { id: "Maquinacao", nome: "Maquinação", icon: "⚙️" },
+            { id: "Transporte", nome: "Transportes", icon: "🚛" }
+        ];
+
+        // ============================================================
+        // DADOS - Operações
+        // ============================================================
+        const OPERACOES = [
+            // E2 Upper/Lower
+            { op: "E2- Soldadura Integral do bastidor", unidade: "Evora1-Soldadura", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            { op: "E2- Colocação de fundo e patins", unidade: "Evora1-Montagem", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            { op: "E2-Montagem e revestimento integral de suportes", unidade: "Evora1-Montagem", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            { op: "E2-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            { op: "E2-Montagem de suportes, topos, colocação de lona e armazenagem", unidade: "Evora1-Montagem", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            { op: "E2- Embalamento", unidade: "Evora1-Embalamento", artigos: ["E2-Lower Dir V2", "E2-Lower Esq V2", "E2-Upper Dir V2", "E2-Upper Esq V2"] },
+            // KC390 Upper/Lower
+            { op: "KC390-Soldadura Integral bastidor", unidade: "Evora1-Soldadura", artigos: ["KC 390-Lower Dir", "KC 390-Lower Esq", "KC 390-Upper Dir", "KC 390-Upper Esq"] },
+            { op: "KC390-Montagem caixa", unidade: "Evora1-Montagem", artigos: ["KC 390-Lower Dir", "KC 390-Lower Esq", "KC 390-Upper Dir", "KC 390-Upper Esq"] },
+            { op: "KC390 asa-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["KC 390-Lower Dir", "KC 390-Lower Esq", "KC 390-Upper Dir", "KC 390-Upper Esq"] },
+            { op: "KC 390-Embalamento", unidade: "Evora1-Embalamento", artigos: ["KC 390-Lower Dir", "KC 390-Lower Esq", "KC 390-Upper Dir", "KC 390-Upper Esq"] },
+            // KC390 EV
+            { op: "KC390 EV-Montagem caixa", unidade: "Evora1-Montagem", artigos: ["KC 390 EV"] },
+            { op: "KC390 EV-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["KC 390 EV"] },
+            { op: "KC390 EV-Embalamento", unidade: "Evora1-Embalamento", artigos: ["KC 390 EV"] },
+            // KC390 EH
+            { op: "KC390 EH-Montagem caixa", unidade: "Evora1-Montagem", artigos: ["KC390-EH"] },
+            { op: "KC390 EH-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["KC390-EH"] },
+            { op: "KC390 EH-Embalamento", unidade: "Evora1-Embalamento", artigos: ["KC390-EH"] },
+            // Praetor Semi Asa
+            { op: "Praetor Semi asa- Soldadura Integral do bastidor", unidade: "Evora1-Soldadura", artigos: ["Praetor- Semi Asa Dir", "Praetor- Semi Asa Esq"] },
+            { op: "Praetor Semi asa-Montagem de suportes, topos, colocação de lona e armazenagem", unidade: "Evora1-Montagem", artigos: ["Praetor- Semi Asa Dir", "Praetor- Semi Asa Esq"] },
+            { op: "Praetor Semi asa-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["Praetor- Semi Asa Dir", "Praetor- Semi Asa Esq"] },
+            { op: "Praetor Semi asa-Embalamento", unidade: "Evora1-Embalamento", artigos: ["Praetor- Semi Asa Dir", "Praetor- Semi Asa Esq"] },
+            // Praetor EH/EV/TC
+            { op: "Praetor EH-Montagem", unidade: "Evora1-Montagem", artigos: ["Praetor EH"] },
+            { op: "Praetor EH-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["Praetor EH"] },
+            { op: "Praetor EH-Embalamento", unidade: "Evora1-Embalamento", artigos: ["Praetor EH"] },
+            { op: "Praetor EV- Montagem caixa", unidade: "Evora1-Montagem", artigos: ["Praetor EV"] },
+            { op: "Praetor EV-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["Praetor EV"] },
+            { op: "Praetor EV- Embalamento", unidade: "Evora1-Embalamento", artigos: ["Praetor EV"] },
+            { op: "Montagem caixa Tail cone", unidade: "Evora1-Montagem", artigos: ["Praetor TC"] },
+            { op: "Praetor TC-Preparação de Bolsa de alumínio", unidade: "Evora1-Montagem", artigos: ["Praetor TC"] },
+            { op: "Embalamento Tail cone", unidade: "Evora1-Embalamento", artigos: ["Praetor TC"] },
+            // E2 Frações
+            { op: "E2-Frac-Preparação e Montagem", unidade: "Évora 2-Montagem", artigos: ["E2- Cx1 Desc 4Metros", "E2-Frac 2", "E2-Frac 7", "E2-Frac 8", "E2-Frac 9", "E2-Frac 10", "E2-Frac 11", "E2-Frac 12", "E2-Frac 22"] },
+            // KC390 Frações
+            { op: "KC390-Frac-Preparação e Montagem", unidade: "Évora 2-Montagem", artigos: ["KC 390 Frac 2", "KC 390 Frac 4", "KC 390 Frac 6", "KC 390 Frac 13", "KC 390 Wing tip"] },
+            // E1
+            { op: "E1-Preparação e Montagem", unidade: "Évora 2-Montagem", artigos: ["E1-Embalagem A", "E1-Embalagem F", "E1-Embalagem G", "E1-Embalagem NMF"] },
+            // Maquinação
+            { op: "Preparação e Montagem Cx sobras", unidade: "Évora 2-Montagem", artigos: ["Cxs sobras reforçadas", "Cxs sobras tipo jaula 1600*1200*800", "Cxs sobras tipo jaula 1600", "Cxs sobras tipo jaula 1200"] },
+            // Transporte
+            { op: "Carga e Transporte de caixas para ANN/EMBARESA2", unidade: "Transportes", artigos: ["Transporte"] }
+        ];
+
+        // ============================================================
+        // DADOS - Perturbações
+        // ============================================================
+        const PERTURBACOES = [
+            "Atraso entrega de peça no cliente",
+            "Avaria pistola cravação",
+            "Avaria/ Manutenção ponte rolante",
+            "Descarga camião material",
+            "Falha leitura do plano/ material errado",
+            "Falta de Pessoal",
+            "Falta material de embalagem",
+            "Limpeza",
+            "Limpeza camião",
+            "Limpeza e preparação material para soldadura",
+            "Manutenção Programada",
+            "Material de embalagem Fora de dimensões",
+            "Movimentação residuos para destinatário reciclagem",
+            "Novos equipamentos /Formação / 1ªpeça/ Try outs",
+            "Organização & Movimentação de material",
+            "Preparação arranque/ fim e para cliente",
+            "Preparação de material",
+            "Preparação material para stock de semiacabados E2",
+            "Preparação material para stock de semiacabados Fracções",
+            "Problemas de esquadria - madeira torcida",
+            "Produto não conforme",
+            "Produto não conforme no cliente",
+            "Produto para Semi-Acabado",
+            "Reparação de lona rasgada",
+            "Reparação produto não conforme para cliente",
+            "Reunião/ analise planeamento vs objectivos",
+            "Separação de material para montagem",
+            "Tempo espera no cliente por falta Caixa / Peça/qualidade"
+        ];
+
+        // ============================================================
+        // DADOS - Feriados
+        // ============================================================
+        const FERIADOS = ['01-01','04-25','05-01','06-10','06-29','08-15','10-05','11-01','12-01','12-08','12-25'];
+
+        // ============================================================
+        // FUNÇÕES UTILITÁRIAS
+        // ============================================================
+        const calcDuracao = (i, f) => {
+            if (!i || !f) return '';
+            const [hi, mi] = i.split(':').map(Number);
+            const [hf, mf] = f.split(':').map(Number);
+            let m = (hf * 60 + mf) - (hi * 60 + mi);
+            if (m < 0) m += 1440;
+            return Math.floor(m / 60) + 'h ' + (m % 60) + 'min';
+        };
+
+        const calcMin = (i, f) => {
+            if (!i || !f) return 0;
+            const [hi, mi] = i.split(':').map(Number);
+            const [hf, mf] = f.split(':').map(Number);
+            let m = (hf * 60 + mf) - (hi * 60 + mi);
+            return m < 0 ? m + 1440 : m;
+        };
+
+        const formatData = d => d ? d.split('-').reverse().join('/') : '';
+        const eFeriado = d => FERIADOS.includes(d.slice(5));
+
+        const enviarPowerAutomate = async (url, dados) => {
+            if (!url || url.includes('xxx')) {
+                console.log('Power Automate não configurado:', dados);
+                return true;
+            }
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+                return true;
+            } catch (e) {
+                console.log('Enviado (CORS):', dados);
+                return true;
+            }
+        };
+
+        // ============================================================
+        // COMPONENTE APP
+        // ============================================================
+        const App = () => {
+            // Estados
+            const [view, setView] = useState('menu');
+            const [operador, setOperador] = useState(localStorage.getItem('operadorProd') || '');
+            const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem('operadorProd'));
+            const [loading, setLoading] = useState(false);
+            const [dataAtual, setDataAtual] = useState(new Date().toISOString().split('T')[0]);
+
+            const [registos, setRegistos] = useState(() => {
+                const s = localStorage.getItem('registosProd');
+                return s ? JSON.parse(s) : [];
+            });
+
+            const [perturbacoes, setPerturbacoes] = useState(() => {
+                const s = localStorage.getItem('perturbacoesProd');
+                return s ? JSON.parse(s) : [];
+            });
+
+            const [registo, setRegisto] = useState({
+                data: dataAtual, tipo: '', artigo: '', operacao: '', unidade: '',
+                horaInicio: '', horaFim: '', comentarios: ''
+            });
+
+            const [pert, setPert] = useState({
+                data: dataAtual, tipo: '', horaInicio: '', horaFim: ''
+            });
+
+            // Estados para configurações dinâmicas
+            const [artigosLista, setArtigosLista] = useState(ARTIGOS);
+            const [operacoesLista, setOperacoesLista] = useState(OPERACOES);
+            const [colaboradoresLista, setColaboradoresLista] = useState(COLABORADORES);
+
+            // Persistência
+            useEffect(() => { localStorage.setItem('registosProd', JSON.stringify(registos)); }, [registos]);
+            useEffect(() => { localStorage.setItem('perturbacoesProd', JSON.stringify(perturbacoes)); }, [perturbacoes]);
+
+            // Filtros
+            const artigosFilt = useMemo(() => 
+                registo.tipo ? artigosLista.filter(a => a.tipo === registo.tipo) : []
+            , [registo.tipo, artigosLista]);
+
+            const opsFilt = useMemo(() => 
+                registo.artigo ? operacoesLista.filter(o => o.artigos.includes(registo.artigo)) : []
+            , [registo.artigo, operacoesLista]);
+
+            const regsDia = useMemo(() => 
+                registos.filter(r => r.data === dataAtual && r.colaborador === operador)
+            , [registos, dataAtual, operador]);
+
+            const pertsDia = useMemo(() => 
+                perturbacoes.filter(p => p.data === dataAtual && p.colaborador === operador)
+            , [perturbacoes, dataAtual, operador]);
+
+            // Totais
+            const totais = useMemo(() => {
+                let mp = 0, mpt = 0;
+                regsDia.forEach(r => mp += calcMin(r.horaInicio, r.horaFim));
+                pertsDia.forEach(p => mpt += calcMin(p.horaInicio, p.horaFim));
+                return { ops: regsDia.length, perts: pertsDia.length, tempoProd: mp, tempoPert: mpt, total: mp + mpt };
+            }, [regsDia, pertsDia]);
+
+            // Resumo por tipo
+            const resumoPorTipo = useMemo(() => {
+                const r = {};
+                regsDia.forEach(reg => {
+                    const art = ARTIGOS.find(a => a.artigo === reg.artigo);
+                    const t = art?.tipo || 'Outro';
+                    if (!r[t]) r[t] = { ops: 0, min: 0 };
+                    r[t].ops++;
+                    r[t].min += calcMin(reg.horaInicio, reg.horaFim);
+                });
+                return r;
+            }, [regsDia]);
+
+            // Login/Logout
+            const login = () => {
+                if (!operador) { alert('Selecione o seu nome!'); return; }
+                localStorage.setItem('operadorProd', operador);
+                setLoggedIn(true);
+            };
+
+            const logout = () => {
+                localStorage.removeItem('operadorProd');
+                setOperador('');
+                setLoggedIn(false);
+                setView('menu');
+            };
+
+            // Adicionar registo
+            const addRegisto = async () => {
+                if (!registo.artigo || !registo.operacao || !registo.horaInicio || !registo.horaFim) {
+                    alert('Preencha todos os campos obrigatórios!');
+                    return;
+                }
+
+                if (eFeriado(registo.data) && !confirm(formatData(registo.data) + ' é feriado. Continuar?')) return;
+
+                setLoading(true);
+                const id = Date.now();
+                const dur = calcDuracao(registo.horaInicio, registo.horaFim);
+                const art = ARTIGOS.find(a => a.artigo === registo.artigo);
+
+                const novo = {
+                    id,
+                    data: registo.data,
+                    artigo: registo.artigo,
+                    tipoCaixa: art?.tipo || '',
+                    operacao: registo.operacao,
+                    unidade: registo.unidade,
+                    colaborador: operador,
+                    horaInicio: registo.horaInicio,
+                    horaFim: registo.horaFim,
+                    duracao: dur,
+                    comentarios: registo.comentarios,
+                    dataHora: new Date().toLocaleString('pt-PT'),
+                    synced: false
+                };
+
+                // Enviar para Power Automate
+                const enviado = await enviarPowerAutomate(CONFIG.URL_PRODUCAO, {
+                    ID: id.toString(),
+                    Data: registo.data,
+                    Artigo: registo.artigo,
+                    TipoCaixa: art?.tipo || '',
+                    Operacao: registo.operacao,
+                    UnidadeProducao: registo.unidade,
+                    Colaborador: operador,
+                    HoraInicio: registo.horaInicio,
+                    HoraFim: registo.horaFim,
+                    Duracao: dur,
+                    Comentarios: registo.comentarios || '',
+                    DataHoraRegisto: new Date().toLocaleString('pt-PT')
+                });
+
+                novo.synced = enviado;
+                setRegistos([...registos, novo]);
+
+                setRegisto({
+                    ...registo,
+                    artigo: '', operacao: '', unidade: '',
+                    horaInicio: registo.horaFim, horaFim: '', comentarios: ''
+                });
+
+                setLoading(false);
+                alert('✅ Operação registada!');
+            };
+
+            // Adicionar perturbação
+            const addPert = async () => {
+                if (!pert.tipo || !pert.horaInicio || !pert.horaFim) {
+                    alert('Preencha todos os campos!');
+                    return;
+                }
+
+                setLoading(true);
+                const id = Date.now();
+                const dur = calcDuracao(pert.horaInicio, pert.horaFim);
+
+                const nova = {
+                    id,
+                    data: pert.data,
+                    tipo: pert.tipo,
+                    colaborador: operador,
+                    horaInicio: pert.horaInicio,
+                    horaFim: pert.horaFim,
+                    duracao: dur,
+                    dataHora: new Date().toLocaleString('pt-PT'),
+                    synced: false
+                };
+
+                const enviado = await enviarPowerAutomate(CONFIG.URL_PERTURBACOES, {
+                    IDRegisto: id.toString(),
+                    Data: pert.data,
+                    Colaborador: operador,
+                    TipoPerturbacao: pert.tipo,
+                    HoraInicio: pert.horaInicio,
+                    HoraFim: pert.horaFim,
+                    Duracao: dur,
+                    DataHoraRegisto: new Date().toLocaleString('pt-PT')
+                });
+
+                nova.synced = enviado;
+                setPerturbacoes([...perturbacoes, nova]);
+
+                setPert({ ...pert, tipo: '', horaInicio: pert.horaFim, horaFim: '' });
+                setLoading(false);
+                setView('menu');
+                alert('✅ Perturbação registada!');
+            };
+
+            // ============================================================
+            // ECRÃ LOGIN
+            // ============================================================
+            if (!loggedIn) {
+                return (
+                    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                        <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
+                            <div className="text-center mb-4">
+                                <div style={{ fontSize: '60px', marginBottom: '10px' }}>🏭</div>
+                                <h1 style={{ fontSize: '24px', color: '#1e40af', margin: '0 0 5px 0' }}>Registo de Produção</h1>
+                                <p style={{ color: '#64748b', margin: 0 }}>Embaresa PT - Évora</p>
+                            </div>
+                            <div className="mb-4">
+                                <label className="label">👤 O seu nome</label>
+                                <select className="input" value={operador} onChange={e => setOperador(e.target.value)}>
+                                    <option value="">Selecionar...</option>
+                                    {COLABORADORES.sort().map((c, i) => <option key={i} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '16px', fontSize: '18px' }} onClick={login}>
+                                Entrar ➔
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // ECRÃ OPERAÇÃO
+            // ============================================================
+            if (view === 'operacao') {
+                return (
+                    <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)', color: 'white', padding: '20px', paddingTop: '40px' }}>
+                            <button className="btn btn-secondary" style={{ marginBottom: '15px' }} onClick={() => setView('menu')}>← Voltar</button>
+                            <h1 style={{ margin: 0, fontSize: '22px' }}>📦 Registar Operação</h1>
+                            <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: '14px' }}>{operador}</p>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            <div className="card">
+                                <div className="mb-3">
+                                    <label className="label">📅 Data</label>
+                                    <input type="date" className="input" value={registo.data} onChange={e => setRegisto({ ...registo, data: e.target.value })} />
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="label">🏭 Programa</label>
+                                    <select className="input" value={registo.tipo} onChange={e => setRegisto({ ...registo, tipo: e.target.value, artigo: '', operacao: '', unidade: '' })}>
+                                        <option value="">Selecionar...</option>
+                                        {TIPOS.map(t => <option key={t.id} value={t.id}>{t.icon} {t.nome}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="label">📦 Artigo</label>
+                                    <select className="input" value={registo.artigo} onChange={e => setRegisto({ ...registo, artigo: e.target.value, operacao: '', unidade: '' })} disabled={!registo.tipo}>
+                                        <option value="">{registo.tipo ? 'Selecionar...' : 'Selecione programa primeiro'}</option>
+                                        {artigosFilt.map((a, i) => <option key={i} value={a.artigo}>{a.artigo}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="label">🔧 Operação</label>
+                                    <select className="input" value={registo.operacao} onChange={e => {
+                                        const o = OPERACOES.find(x => x.op === e.target.value);
+                                        setRegisto({ ...registo, operacao: e.target.value, unidade: o?.unidade || '' });
+                                    }} disabled={!registo.artigo}>
+                                        <option value="">{registo.artigo ? 'Selecionar...' : 'Selecione artigo primeiro'}</option>
+                                        {opsFilt.map((o, i) => <option key={i} value={o.op}>{o.op}</option>)}
+                                    </select>
+                                    {registo.unidade && (
+                                        <div style={{ marginTop: '8px', padding: '8px 12px', background: '#eff6ff', borderRadius: '8px', fontSize: '13px', color: '#1e40af' }}>
+                                            📍 {registo.unidade}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="label">⏱️ Horário</label>
+                                    <div className="grid-2">
+                                        <div>
+                                            <label style={{ fontSize: '12px', color: '#64748b' }}>Início</label>
+                                            <input type="time" className="input" value={registo.horaInicio} onChange={e => setRegisto({ ...registo, horaInicio: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '12px', color: '#64748b' }}>Fim</label>
+                                            <input type="time" className="input" value={registo.horaFim} onChange={e => setRegisto({ ...registo, horaFim: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    {registo.horaInicio && registo.horaFim && (
+                                        <div style={{ marginTop: '10px', padding: '10px', background: '#dcfce7', borderRadius: '8px', textAlign: 'center', fontWeight: '700', color: '#059669' }}>
+                                            Duração: {calcDuracao(registo.horaInicio, registo.horaFim)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="label">💬 Comentários (opcional)</label>
+                                    <textarea className="input" rows={2} value={registo.comentarios} onChange={e => setRegisto({ ...registo, comentarios: e.target.value })} placeholder="Observações..." />
+                                </div>
+
+                                <button className="btn btn-success" style={{ width: '100%', padding: '16px', fontSize: '18px' }} onClick={addRegisto} disabled={loading}>
+                                    {loading ? '⏳ A guardar...' : '✓ Registar Operação'}
+                                </button>
+                            </div>
+
+                            {regsDia.length > 0 && (
+                                <div className="card">
+                                    <h3 style={{ margin: '0 0 15px 0' }}>Operações de hoje ({regsDia.length})</h3>
+                                    {regsDia.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio)).map(r => (
+                                        <div key={r.id} style={{ background: '#f1f5f9', borderRadius: '10px', padding: '12px', marginBottom: '8px', borderLeft: '4px solid #1e40af' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '600' }}>{r.horaInicio} - {r.horaFim} ({r.duracao})</div>
+                                                    <div style={{ fontWeight: '600' }}>{r.artigo}</div>
+                                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{r.operacao}</div>
+                                                </div>
+                                                <button style={{ background: '#fee2e2', border: 'none', color: '#dc2626', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }} onClick={() => {
+                                                    if (confirm('Eliminar este registo?')) setRegistos(registos.filter(x => x.id !== r.id));
+                                                }}>🗑️</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // ECRÃ PERTURBAÇÃO
+            // ============================================================
+            if (view === 'perturbacao') {
+                return (
+                    <div style={{ minHeight: '100vh', background: '#fef2f2' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: 'white', padding: '20px', paddingTop: '40px' }}>
+                            <button className="btn" style={{ background: 'rgba(255,255,255,0.2)', marginBottom: '15px' }} onClick={() => setView('menu')}>← Voltar</button>
+                            <h1 style={{ margin: 0, fontSize: '22px' }}>⚠️ Registar Perturbação</h1>
+                            <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: '14px' }}>{operador}</p>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            <div className="card">
+                                <div className="mb-3">
+                                    <label className="label">📅 Data</label>
+                                    <input type="date" className="input" value={pert.data} onChange={e => setPert({ ...pert, data: e.target.value })} />
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="label">Tipo de Perturbação</label>
+                                    <select className="input" value={pert.tipo} onChange={e => setPert({ ...pert, tipo: e.target.value })}>
+                                        <option value="">Selecionar...</option>
+                                        {PERTURBACOES.map((p, i) => <option key={i} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="label">⏱️ Horário</label>
+                                    <div className="grid-2">
+                                        <div>
+                                            <label style={{ fontSize: '12px', color: '#64748b' }}>Início</label>
+                                            <input type="time" className="input" style={{ borderColor: '#fecaca' }} value={pert.horaInicio} onChange={e => setPert({ ...pert, horaInicio: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '12px', color: '#64748b' }}>Fim</label>
+                                            <input type="time" className="input" style={{ borderColor: '#fecaca' }} value={pert.horaFim} onChange={e => setPert({ ...pert, horaFim: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    {pert.horaInicio && pert.horaFim && (
+                                        <div style={{ marginTop: '10px', padding: '10px', background: '#fef2f2', borderRadius: '8px', textAlign: 'center', fontWeight: '700', color: '#dc2626' }}>
+                                            Duração: {calcDuracao(pert.horaInicio, pert.horaFim)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button className="btn btn-danger" style={{ width: '100%', padding: '16px', fontSize: '18px' }} onClick={addPert} disabled={loading}>
+                                    {loading ? '⏳ A guardar...' : '✓ Registar Perturbação'}
+                                </button>
+                            </div>
+
+                            {pertsDia.length > 0 && (
+                                <div className="card">
+                                    <h3 style={{ margin: '0 0 15px 0', color: '#dc2626' }}>Perturbações de hoje ({pertsDia.length})</h3>
+                                    {pertsDia.map(p => (
+                                        <div key={p.id} style={{ background: '#fef2f2', borderRadius: '10px', padding: '12px', marginBottom: '8px', borderLeft: '4px solid #dc2626' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600' }}>{p.horaInicio} - {p.horaFim} ({p.duracao})</div>
+                                                    <div style={{ fontWeight: '600', color: '#b91c1c' }}>{p.tipo}</div>
+                                                </div>
+                                                <button style={{ background: '#fee2e2', border: 'none', color: '#dc2626', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }} onClick={() => {
+                                                    if (confirm('Eliminar esta perturbação?')) setPerturbacoes(perturbacoes.filter(x => x.id !== p.id));
+                                                }}>🗑️</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // ECRÃ RESUMO
+            // ============================================================
+            if (view === 'resumo') {
+                return (
+                    <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)', color: 'white', padding: '20px', paddingTop: '40px' }}>
+                            <button className="btn" style={{ background: 'rgba(255,255,255,0.2)', marginBottom: '15px' }} onClick={() => setView('menu')}>← Voltar</button>
+                            <h1 style={{ margin: 0, fontSize: '22px' }}>📊 Resumo do Dia</h1>
+                            <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: '14px' }}>{formatData(dataAtual)} - {operador}</p>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            {/* Totais */}
+                            <div className="grid-2 mb-3">
+                                <div className="card text-center">
+                                    <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e40af' }}>{totais.ops}</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>Operações</div>
+                                </div>
+                                <div className="card text-center">
+                                    <div style={{ fontSize: '32px', fontWeight: '700', color: '#dc2626' }}>{totais.perts}</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>Perturbações</div>
+                                </div>
+                            </div>
+
+                            <div className="grid-2 mb-4">
+                                <div className="card text-center">
+                                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#059669' }}>
+                                        {Math.floor(totais.tempoProd / 60)}h {totais.tempoProd % 60}min
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>Tempo Produção</div>
+                                </div>
+                                <div className="card text-center">
+                                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#7c3aed' }}>
+                                        {Math.floor(totais.total / 60)}h {totais.total % 60}min
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>Tempo Total</div>
+                                </div>
+                            </div>
+
+                            {/* Resumo por tipo */}
+                            {Object.keys(resumoPorTipo).length > 0 && (
+                                <div className="card">
+                                    <h3 style={{ margin: '0 0 15px 0' }}>📦 Por Tipo de Caixa</h3>
+                                    {Object.entries(resumoPorTipo).map(([tipo, d]) => {
+                                        const t = TIPOS.find(x => x.id === tipo);
+                                        return (
+                                            <div key={tipo} style={{ background: '#f1f5f9', borderRadius: '10px', padding: '12px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: '600' }}>{t?.icon} {t?.nome || tipo}</div>
+                                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{d.ops} operações</div>
+                                                </div>
+                                                <div style={{ fontWeight: '700', color: '#1e40af' }}>
+                                                    {Math.floor(d.min / 60)}h {d.min % 60}min
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Lista de operações */}
+                            {regsDia.length > 0 && (
+                                <div className="card">
+                                    <h3 style={{ margin: '0 0 15px 0' }}>📋 Operações</h3>
+                                    {regsDia.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio)).map((r, i) => (
+                                        <div key={r.id} style={{ padding: '10px 0', borderBottom: i < regsDia.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                            <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '600' }}>{r.horaInicio} - {r.horaFim}</div>
+                                            <div style={{ fontWeight: '600' }}>{r.artigo}</div>
+                                            <div style={{ fontSize: '12px', color: '#64748b' }}>{r.operacao}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Lista de perturbações */}
+                            {pertsDia.length > 0 && (
+                                <div className="card">
+                                    <h3 style={{ margin: '0 0 15px 0', color: '#dc2626' }}>⚠️ Perturbações</h3>
+                                    {pertsDia.map((p, i) => (
+                                        <div key={p.id} style={{ padding: '10px 0', borderBottom: i < pertsDia.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                            <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600' }}>{p.horaInicio} - {p.horaFim}</div>
+                                            <div style={{ fontWeight: '600', color: '#b91c1c' }}>{p.tipo}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Mensagem se vazio */}
+                            {regsDia.length === 0 && pertsDia.length === 0 && (
+                                <div className="card text-center" style={{ padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '15px' }}>📭</div>
+                                    <p style={{ color: '#64748b', margin: 0 }}>Sem registos para este dia</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // ============================================================
+            // MENU PRINCIPAL
+            // ============================================================
+            return (
+                <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+                    {/* Header */}
+                    <div style={{ background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)', color: 'white', padding: '20px', paddingTop: '40px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h1 style={{ margin: 0, fontSize: '22px' }}>🏭 Registo Produção</h1>
+                                <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: '14px' }}>{operador}</p>
+                            </div>
+                            <button className="btn" style={{ background: 'rgba(255,255,255,0.2)' }} onClick={() => setView('resumo')}>📊</button>
+                        </div>
+
+                        {/* Seletor de data */}
+                        <div style={{ marginTop: '15px', padding: '10px 15px', background: 'rgba(255,255,255,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span>📅</span>
+                            <input 
+                                type="date" 
+                                value={dataAtual} 
+                                onChange={e => {
+                                    setDataAtual(e.target.value);
+                                    setRegisto({ ...registo, data: e.target.value });
+                                    setPert({ ...pert, data: e.target.value });
+                                }}
+                                style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '16px', fontWeight: '600' }}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '20px' }}>
+                        {/* Totais do dia */}
+                        {(totais.ops > 0 || totais.perts > 0) && (
+                            <div className="grid-2 mb-3">
+                                <div className="card text-center" style={{ padding: '15px' }}>
+                                    <div style={{ fontSize: '28px', fontWeight: '700', color: '#1e40af' }}>{totais.ops}</div>
+                                    <div style={{ fontSize: '11px', color: '#64748b' }}>Operações</div>
+                                </div>
+                                <div className="card text-center" style={{ padding: '15px' }}>
+                                    <div style={{ fontSize: '28px', fontWeight: '700', color: '#dc2626' }}>{totais.perts}</div>
+                                    <div style={{ fontSize: '11px', color: '#64748b' }}>Perturbações</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Indicador de horas */}
+                        {totais.total > 0 && (
+                            <div className="card mb-3" style={{ 
+                                background: totais.total >= 450 ? '#dcfce7' : totais.total >= 360 ? '#fef3c7' : '#fee2e2',
+                                border: '2px solid ' + (totais.total >= 450 ? '#059669' : totais.total >= 360 ? '#f59e0b' : '#dc2626')
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '24px' }}>{totais.total >= 450 ? '✅' : '⏰'}</span>
+                                    <div>
+                                        <div style={{ fontWeight: '700', color: totais.total >= 450 ? '#059669' : totais.total >= 360 ? '#92400e' : '#dc2626' }}>
+                                            {totais.total >= 450 ? 'Dia completo!' : 'Faltam ' + Math.floor((480 - totais.total) / 60) + 'h ' + ((480 - totais.total) % 60) + 'min'}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                            Total: {Math.floor(totais.total / 60)}h {totais.total % 60}min / 8h
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Botão Operação */}
+                        <button className="btn btn-primary mb-3" style={{ width: '100%', padding: '20px', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => setView('operacao')}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <span style={{ fontSize: '30px' }}>📦</span>
+                                <div style={{ textAlign: 'left' }}>
+                                    <div>Registar Operação</div>
+                                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: '400' }}>Artigo, operação, tempo</div>
+                                </div>
+                            </div>
+                            <span>→</span>
+                        </button>
+
+                        {/* Botão Perturbação */}
+                        <button className="btn btn-danger mb-3" style={{ width: '100%', padding: '20px', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => setView('perturbacao')}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <span style={{ fontSize: '30px' }}>⚠️</span>
+                                <div style={{ textAlign: 'left' }}>
+                                    <div>Registar Perturbação</div>
+                                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: '400' }}>Paragens, avarias, etc.</div>
+                                </div>
+                            </div>
+                            <span>→</span>
+                        </button>
+
+                        {/* Botão Resumo */}
+                        <button className="btn btn-secondary mb-4" style={{ width: '100%', padding: '16px' }} onClick={() => setView('resumo')}>
+                            📊 Ver Resumo do Dia
+                        </button>
+
+                        {/* Alterar colaborador */}
+                        <button className="btn" style={{ width: '100%', background: 'transparent', color: '#64748b' }} onClick={logout}>
+                            🔄 Alterar colaborador
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
