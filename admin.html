@@ -225,7 +225,16 @@
 
             const [artigosConfig, setArtigosConfig] = useState(() => {
                 const s = localStorage.getItem('adminArtigosConfig');
-                return s ? JSON.parse(s) : ARTIGOS;
+                if (s) {
+                    const parsed = JSON.parse(s);
+                    // Verificar se cache tem dados antigos (tipo "Frac" em vez de programa correto)
+                    if (parsed.some(a => a.tipo === 'Frac')) {
+                        localStorage.removeItem('adminArtigosConfig');
+                        return ARTIGOS;
+                    }
+                    return parsed;
+                }
+                return ARTIGOS;
             });
 
             const [operacoesConfig, setOperacoesConfig] = useState(() => {
