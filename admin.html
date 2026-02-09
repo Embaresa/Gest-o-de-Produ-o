@@ -378,12 +378,25 @@
                             };
                         }).filter(r => r.data);
                         
-                        console.log('Registos processados:', regs.length);
-                        console.log('Primeiro registo:', regs[0]);
-                        console.log('Datas únicas:', [...new Set(regs.map(r => r.data))].slice(0, 10));
-                        console.log('Colaboradores únicos:', [...new Set(regs.map(r => r.colaborador))]);
-                        setRegistos(regs);
-                        localStorage.setItem('adminRegistos', JSON.stringify(regs));
+                        // Remover duplicados por ID
+                        const regsUnicos = [];
+                        const idsVistos = new Set();
+                        regs.forEach(r => {
+                            const idStr = String(r.id);
+                            if (idStr && idStr !== '' && !idsVistos.has(idStr)) {
+                                idsVistos.add(idStr);
+                                regsUnicos.push(r);
+                            } else if (!idStr || idStr === '') {
+                                regsUnicos.push(r); // manter registos sem ID
+                            }
+                        });
+                        
+                        console.log('Registos processados:', regs.length, '→ Únicos:', regsUnicos.length);
+                        console.log('Primeiro registo:', regsUnicos[0]);
+                        console.log('Datas únicas:', [...new Set(regsUnicos.map(r => r.data))].slice(0, 10));
+                        console.log('Colaboradores únicos:', [...new Set(regsUnicos.map(r => r.colaborador))]);
+                        setRegistos(regsUnicos);
+                        localStorage.setItem('adminRegistos', JSON.stringify(regsUnicos));
                         
                         // Mapa será guardado manualmente via tab Horas
                         // (removido envio automático para evitar duplicados)
@@ -581,6 +594,13 @@
 
             // Guardar edição
             const guardarEdicao = async () => {
+                if (loading) return;
+                const idStr = String(formEdit.id);
+                if (!idStr || idStr === '' || idStr === 'undefined') {
+                    alert('⚠️ Registo sem ID válido. Não é possível editar.');
+                    return;
+                }
+                setLoading(true);
                 try {
                     // Calcular duração
                     const mins = calcMin(formEdit.horaInicio, formEdit.horaFim);
@@ -591,7 +611,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            id: String(formEdit.id),
+                            id: idStr,
                             Data: formEdit.data,
                             Artigo: formEdit.artigo,
                             TipoCaixa: formEdit.tipoCaixa,
@@ -602,11 +622,19 @@
                             HoraFim: formEdit.horaFim,
                             Duracao: duracao,
                             Comentarios: formEdit.comentarios || ''
-                        })
+                        }),
+                        mode: 'no-cors'
                     });
                     
-                    // Atualizar localmente
-                    const novos = registos.map(r => r.id === formEdit.id ? { ...formEdit, duracao } : r);
+                    // Atualizar localmente - apenas o primeiro match para evitar duplicados
+                    let atualizado = false;
+                    const novos = registos.map(r => {
+                        if (!atualizado && String(r.id) === idStr) {
+                            atualizado = true;
+                            return { ...formEdit, duracao };
+                        }
+                        return r;
+                    });
                     setRegistos(novos);
                     localStorage.setItem('adminRegistos', JSON.stringify(novos));
                     
@@ -621,9 +649,10 @@
                     alert('✅ Registo alterado!');
                 } catch (error) {
                     console.error('Erro ao alterar:', error);
-                    alert('✅ Registo alterado!');
+                    alert('⚠️ Possível erro ao alterar. Faça Sync para confirmar.');
                     setEditando(null);
                 }
+                setLoading(false);
             };
 
             // Eliminar registo de produção
@@ -633,14 +662,16 @@
                         await fetch(CONFIG.URL_ELIMINAR_PROD, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: String(id) })
+                            body: JSON.stringify({ id: String(id) }),
+                            mode: 'no-cors'
                         });
                     } catch (error) {
                         console.log('Erro (pode ter funcionado):', error);
                     }
                     
-                    // Remover localmente
-                    const novos = registos.filter(r => r.id !== id);
+                    // Remover localmente (comparar como string)
+                    const idStr = String(id);
+                    const novos = registos.filter(r => String(r.id) !== idStr);
                     setRegistos(novos);
                     localStorage.setItem('adminRegistos', JSON.stringify(novos));
                     
@@ -662,14 +693,16 @@
                         await fetch(CONFIG.URL_ELIMINAR_PERT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: String(id) })
+                            body: JSON.stringify({ id: String(id) }),
+                            mode: 'no-cors'
                         });
                     } catch (error) {
                         console.log('Erro (pode ter funcionado):', error);
                     }
                     
-                    // Remover localmente
-                    const novos = perturbacoes.filter(p => p.id !== id);
+                    // Remover localmente (comparar como string)
+                    const idStr = String(id);
+                    const novos = perturbacoes.filter(p => String(p.id) !== idStr);
                     setPerturbacoes(novos);
                     localStorage.setItem('adminPerturbacoes', JSON.stringify(novos));
                     
