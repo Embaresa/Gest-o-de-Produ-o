@@ -385,10 +385,8 @@
                         setRegistos(regs);
                         localStorage.setItem('adminRegistos', JSON.stringify(regs));
                         
-                        // Guardar mapa do mês atual automaticamente
-                        const hoje = new Date();
-                        const mesAtualAuto = hoje.toISOString().slice(0, 7);
-                        setTimeout(() => guardarMapaAuto(mesAtualAuto, regs), 1000);
+                        // Mapa será guardado manualmente via tab Horas
+                        // (removido envio automático para evitar duplicados)
                     }
 
                     // Carregar perturbações
@@ -688,8 +686,9 @@
 
             // Função para guardar mapa de horas automaticamente
             const guardarMapaAuto = async (mes, registosData) => {
-                // Verificar se já foi guardado
-                if (mesesGuardados.includes(mes)) {
+                // Verificar se já foi guardado (usar localStorage direto para evitar estado stale)
+                const guardados = JSON.parse(localStorage.getItem('adminMesesGuardados') || '[]');
+                if (guardados.includes(mes)) {
                     console.log('Mês', mes, 'já guardado, ignorando...');
                     return;
                 }
@@ -731,18 +730,21 @@
                     return;
                 }
                 
+                // Marcar como guardado ANTES de enviar para evitar duplicados
+                const novosGuardados = [...guardados, mes];
+                setMesesGuardados(novosGuardados);
+                localStorage.setItem('adminMesesGuardados', JSON.stringify(novosGuardados));
+                
                 try {
                     await fetch(CONFIG.URL_GUARDAR_MAPA, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mes, dados })
+                        body: JSON.stringify({ mes, dados, substituir: true }),
+                        mode: 'no-cors'
                     });
                     console.log('Mapa', mes, 'guardado!');
-                    setMesesGuardados(prev => [...prev, mes]);
                 } catch (e) {
-                    console.log('Erro ao guardar mapa:', e);
-                    // Mesmo com erro CORS pode ter funcionado
-                    setMesesGuardados(prev => [...prev, mes]);
+                    console.log('Erro ao guardar mapa (pode ter funcionado):', e);
                 }
             };
 
@@ -752,12 +754,13 @@
                     await fetch(CONFIG.URL_ESCREVER_CONFIG, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ acao, tabela, dados })
+                        body: JSON.stringify({ acao, tabela, dados }),
+                        mode: 'no-cors'
                     });
                     return true;
                 } catch (e) {
                     console.log('Erro ao escrever:', e);
-                    return true; // Pode ter funcionado mesmo com erro CORS
+                    return false;
                 }
             };
 
