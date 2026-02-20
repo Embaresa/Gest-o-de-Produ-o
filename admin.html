@@ -65,7 +65,7 @@
             URL_LER_PERTURBACOES: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/713deb70570a43daad73ca99c8e85755/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_46-14d-TuRgDzRAumZLCCsUKFPTWIZ3KUKIfIDtp-E',
             URL_ALTERAR: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3fe2ae8ec3354e46b1ebd51b9de8a498/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KpA-ybWxDWTCD6SFvjqjZYU_CfJlhpGLfa_4BPk-Uxo',
             URL_GUARDAR_MAPA: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/037823be51d04782a1f9dd7f3b1d9e94/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xFJz3jSbLKPcesRQqJp-gjnXqFapthnDQlaAlrX8yOE',
-            URL_LER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/464482ea19714e50b858771991c0539d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=H29XBCpPy1dyMk7Gyj6LAWy8RKI8Q4mpUFdI5qanNKU',
+            URL_LER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/5da3828d37564c2ba8af16ca06e2b7e0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=NRb520YI7wcDJjMufAfUzrlYIQSQ3ub6dl1KrQ3_FxI',
             URL_ESCREVER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7ac8ac76458141b3bdbf0a981e9bf727/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r5BztBsGszRYRdEyojb8qC5aTfPcYrxZLaMi8-eFmPE',
             URL_ADICIONAR_PROD: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8c8cb9f38df4489eaa2ebd6afcdab255/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jMin9p5_ZxITDMuRcm2PeH8LlrC6SxeM_hNTLRfn-CI',
             URL_LER_ENCOMENDAS: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c77f5fdeb5704193aa1180062b45aad9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2Eub1i-QYw4yW0Jfyp4gvTxgChXKapj9JIyzNeiIUe8',
@@ -481,8 +481,9 @@
                     // Carregar configurações (colaboradores, artigos, operações, ausências, feriados)
                     try {
                         const respConfig = await fetch(CONFIG.URL_LER_CONFIG, {
-                            method: 'GET',
-                            headers: { 'Accept': 'application/json' }
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
                         });
                         const dataConfig = await respConfig.json();
                         console.log('Configurações recebidas:', dataConfig);
@@ -1593,21 +1594,77 @@
                         {/* ==================== EQUIPA ==================== */}
                         {tab === 'equipa' && (
                             <div>
+                                {/* Adicionar novo colaborador */}
+                                <div className="card" style={{ marginBottom: '15px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '10px' }}>➕ Adicionar Colaborador</div>
+                                    <input type="text" className="input mb-2" placeholder="Nome completo" id="novoColabNome" style={{ padding: '8px', fontSize: '12px' }} />
+                                    <select className="input mb-2" id="novoColabTurno" style={{ padding: '8px', fontSize: '12px' }}>
+                                        <option value="normal">Normal (8h)</option>
+                                        <option value="turno1">Turno 1 (7.5h)</option>
+                                        <option value="turno2">Turno 2 (7.5h)</option>
+                                        <option value="rotativo">Rotativo</option>
+                                    </select>
+                                    <button className="btn btn-primary" style={{ width: '100%', padding: '8px', fontSize: '12px' }} onClick={async () => {
+                                        const nome = document.getElementById('novoColabNome').value.trim();
+                                        const turno = document.getElementById('novoColabTurno').value;
+                                        if (!nome) { alert('Preencha o nome!'); return; }
+                                        if (colaboradores.find(c => c.nome.toLowerCase() === nome.toLowerCase())) { alert('Colaborador já existe!'); return; }
+                                        const novoColab = { nome, turno, ativo: true, dias: ['seg','ter','qua','qui','sex'] };
+                                        const novos = [...colaboradores, novoColab];
+                                        setColaboradores(novos);
+                                        document.getElementById('novoColabNome').value = '';
+                                        document.getElementById('novoColabTurno').value = 'normal';
+                                        // Sincronizar com Excel
+                                        const ok = await escreverConfig('adicionar', 'colaboradores', { Nome: nome, Turno: turno, Ativo: 'true', DiasTrabalho: 'seg,ter,qua,qui,sex', SemanaInicioTurno1: '1' });
+                                        if (ok) alert('✅ Colaborador adicionado e sincronizado!');
+                                        else alert('✅ Colaborador adicionado localmente (erro na sincronização com Excel).');
+                                    }}>Adicionar</button>
+                                </div>
+
                                 {colaboradores.map((c, i) => (
                                     <div key={i} className="card">
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                             <span style={{ fontWeight: '600', fontSize: '13px' }}>{c.nome}</span>
-                                            <button 
-                                                className={c.ativo ? 'btn btn-success' : 'btn btn-secondary'}
-                                                style={{ padding: '4px 10px', fontSize: '11px' }}
-                                                onClick={() => {
-                                                    const novos = [...colaboradores];
-                                                    novos[i].ativo = !novos[i].ativo;
-                                                    setColaboradores(novos);
-                                                }}
-                                            >
-                                                {c.ativo ? '✓ Ativo' : 'Inativo'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                <button 
+                                                    className={c.ativo ? 'btn btn-success' : 'btn btn-secondary'}
+                                                    style={{ padding: '4px 10px', fontSize: '11px' }}
+                                                    onClick={async () => {
+                                                        const novos = [...colaboradores];
+                                                        novos[i].ativo = !novos[i].ativo;
+                                                        setColaboradores(novos);
+                                                        await escreverConfig('atualizar', 'colaboradores', { Nome: c.nome, Ativo: String(novos[i].ativo) });
+                                                    }}
+                                                >
+                                                    {c.ativo ? '✓ Ativo' : 'Inativo'}
+                                                </button>
+                                                <button
+                                                    className="btn btn-danger"
+                                                    style={{ padding: '4px 10px', fontSize: '11px' }}
+                                                    onClick={async () => {
+                                                        if (!confirm('Eliminar "' + c.nome + '"?')) return;
+                                                        const novos = colaboradores.filter((_, idx) => idx !== i);
+                                                        setColaboradores(novos);
+                                                        const ok = await escreverConfig('eliminar', 'colaboradores', { Nome: c.nome });
+                                                        if (ok) alert('✅ ' + c.nome + ' eliminado!');
+                                                        else alert('⚠️ Removido localmente mas erro na sincronização.');
+                                                    }}
+                                                >
+                                                    🗑️
+                                                </button>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ padding: '4px 10px', fontSize: '11px' }}
+                                                    onClick={async () => {
+                                                        const colab = colaboradores[i];
+                                                        const ok = await escreverConfig('atualizar', 'colaboradores', { Nome: colab.nome, Turno: colab.turno, Ativo: String(colab.ativo), DiasTrabalho: (colab.dias || []).join(',') });
+                                                        if (ok) alert('✅ ' + colab.nome + ' sincronizado!');
+                                                        else alert('⚠️ Erro na sincronização.');
+                                                    }}
+                                                >
+                                                    💾 Guardar
+                                                </button>
+                                            </div>
                                         </div>
                                         <select className="input" value={c.turno} style={{ marginBottom: '8px' }} onChange={e => {
                                             const novos = [...colaboradores];
