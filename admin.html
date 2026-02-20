@@ -66,7 +66,10 @@
             URL_ALTERAR: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3fe2ae8ec3354e46b1ebd51b9de8a498/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KpA-ybWxDWTCD6SFvjqjZYU_CfJlhpGLfa_4BPk-Uxo',
             URL_GUARDAR_MAPA: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/037823be51d04782a1f9dd7f3b1d9e94/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xFJz3jSbLKPcesRQqJp-gjnXqFapthnDQlaAlrX8yOE',
             URL_LER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/464482ea19714e50b858771991c0539d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=H29XBCpPy1dyMk7Gyj6LAWy8RKI8Q4mpUFdI5qanNKU',
-            URL_ESCREVER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7ac8ac76458141b3bdbf0a981e9bf727/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r5BztBsGszRYRdEyojb8qC5aTfPcYrxZLaMi8-eFmPE'
+            URL_ESCREVER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7ac8ac76458141b3bdbf0a981e9bf727/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r5BztBsGszRYRdEyojb8qC5aTfPcYrxZLaMi8-eFmPE',
+            URL_ADICIONAR_PROD: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8c8cb9f38df4489eaa2ebd6afcdab255/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jMin9p5_ZxITDMuRcm2PeH8LlrC6SxeM_hNTLRfn-CI',
+            URL_LER_ENCOMENDAS: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c77f5fdeb5704193aa1180062b45aad9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2Eub1i-QYw4yW0Jfyp4gvTxgChXKapj9JIyzNeiIUe8',
+            URL_LER_TERMINADAS: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/42efb5db25d64c65a609d7c1e9640000/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=eTIEcPyCSQdnarEuPjqaBQ4gWyt8tWkAkzki1BSNffc'
         };
 
         // ============================================================
@@ -214,6 +217,14 @@
         // ============================================================
         const App = () => {
             const [tab, setTab] = useState('resumo');
+            const [encomendas, setEncomendas] = useState([]);
+            const [loadingEnc, setLoadingEnc] = useState(false);
+            const [dataCruz, setDataCruz] = useState(new Date().toISOString().split('T')[0]);
+            const [dataReg, setDataReg] = useState(new Date().toISOString().split('T')[0]);
+            const [datasEnc, setDatasEnc] = useState([new Date().toISOString().split('T')[0]]);
+            const [novaDataEnc, setNovaDataEnc] = useState('');
+            const [editCruz, setEditCruz] = useState(null);
+            const [formCruz, setFormCruz] = useState({});
             const [loading, setLoading] = useState(false);
             const [ultimaSync, setUltimaSync] = useState(localStorage.getItem('adminUltimaSync') || null);
             
@@ -269,6 +280,8 @@
 
             const [modalAberto, setModalAberto] = useState(false);
             const [editando, setEditando] = useState(null);
+            const [adicionando, setAdicionando] = useState(false);
+            const [formNovo, setFormNovo] = useState({});
             const [editandoArtigo, setEditandoArtigo] = useState(null);
             const [editandoOp, setEditandoOp] = useState(null);
             const [formArtigo, setFormArtigo] = useState({ artigo: '', tipo: '' });
@@ -410,9 +423,11 @@
                             body: JSON.stringify({})
                         });
                         const dataPert = await respPert.json();
-                        console.log('Perturbações recebidas:', dataPert);
+                        console.log('Perturbações recebidas:', Array.isArray(dataPert) ? dataPert.length : dataPert);
                         
-                        let pertsRaw = Array.isArray(dataPert) ? dataPert : [];
+                        let pertsRaw = Array.isArray(dataPert) ? dataPert : 
+                            (dataPert.value || dataPert.perturbacoes || dataPert.Perturbacoes || dataPert.data || []);
+                        if (!Array.isArray(pertsRaw)) pertsRaw = [];
                         if (pertsRaw.length > 0) {
                             const perts = pertsRaw.map(p => {
                                 // Converter data
@@ -421,6 +436,11 @@
                                     const num = typeof dataVal === 'number' ? dataVal : parseInt(dataVal);
                                     const date = new Date((num - 25569) * 86400 * 1000);
                                     dataVal = date.toISOString().split('T')[0];
+                                } else if (typeof dataVal === 'string' && dataVal.includes('/')) {
+                                    const parts = dataVal.split('/');
+                                    if (parts[2]?.length === 4) dataVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                                } else if (typeof dataVal === 'string' && dataVal.includes('T')) {
+                                    dataVal = dataVal.split('T')[0];
                                 }
                                 
                                 // Converter horas
@@ -439,7 +459,11 @@
                                     id: p['ID Registo'] || p.IDRegisto || p.ID || p.id || '',
                                     data: dataVal,
                                     tipo: p['Tipo Perturbação'] || p.TipoPerturbacao || p.Tipo || p.tipo || '',
-                                    colaborador: p.Colaborador || p.colaborador || '',
+                                    colaborador: (() => {
+                                        let c = p.Colaborador || p.colaborador || '';
+                                        if (c) c = c.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                                        return c;
+                                    })(),
                                     horaInicio: converterHora(p['Hora Início'] || p.HoraInicio || p.horaInicio),
                                     horaFim: converterHora(p['Hora Fim'] || p.HoraFim || p.horaFim),
                                     duracao: p['Duração'] || p.Duracao || p.duracao || ''
@@ -457,9 +481,8 @@
                     // Carregar configurações (colaboradores, artigos, operações, ausências, feriados)
                     try {
                         const respConfig = await fetch(CONFIG.URL_LER_CONFIG, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({})
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' }
                         });
                         const dataConfig = await respConfig.json();
                         console.log('Configurações recebidas:', dataConfig);
@@ -622,8 +645,7 @@
                             HoraFim: formEdit.horaFim,
                             Duracao: duracao,
                             Comentarios: formEdit.comentarios || ''
-                        }),
-                        mode: 'no-cors'
+                        })
                     });
                     
                     // Atualizar localmente - apenas o primeiro match para evitar duplicados
@@ -659,14 +681,15 @@
             const eliminarRegisto = async (id) => {
                 if (confirm('Eliminar este registo do Excel?')) {
                     try {
-                        await fetch(CONFIG.URL_ELIMINAR_PROD, {
+                        const resp = await fetch(CONFIG.URL_ELIMINAR_PROD, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: String(id) }),
-                            mode: 'no-cors'
+                            body: JSON.stringify({ id: String(id), tabela: 'Produção' })
                         });
+                        if (!resp.ok) console.log('Eliminar prod resp:', resp.status);
                     } catch (error) {
-                        console.log('Erro (pode ter funcionado):', error);
+                        // CORS error esperado se fluxo não tem passo Resposta - o fluxo executa na mesma
+                        console.log('Eliminar prod (provavelmente executou):', error.message);
                     }
                     
                     // Remover localmente (comparar como string)
@@ -690,14 +713,14 @@
             const eliminarPerturbacao = async (id) => {
                 if (confirm('Eliminar esta perturbação do Excel?')) {
                     try {
-                        await fetch(CONFIG.URL_ELIMINAR_PERT, {
+                        const resp = await fetch(CONFIG.URL_ELIMINAR_PERT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: String(id) }),
-                            mode: 'no-cors'
+                            body: JSON.stringify({ id: String(id), tabela: 'Perturbações' })
                         });
+                        if (!resp.ok) console.log('Eliminar pert resp:', resp.status);
                     } catch (error) {
-                        console.log('Erro (pode ter funcionado):', error);
+                        console.log('Eliminar pert (provavelmente executou):', error.message);
                     }
                     
                     // Remover localmente (comparar como string)
@@ -772,8 +795,7 @@
                     await fetch(CONFIG.URL_GUARDAR_MAPA, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mes, dados, substituir: true }),
-                        mode: 'no-cors'
+                        body: JSON.stringify({ mes, dados, substituir: true })
                     });
                     console.log('Mapa', mes, 'guardado!');
                 } catch (e) {
@@ -787,14 +809,203 @@
                     await fetch(CONFIG.URL_ESCREVER_CONFIG, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ acao, tabela, dados }),
-                        mode: 'no-cors'
+                        body: JSON.stringify({ acao, tabela, dados })
                     });
                     return true;
                 } catch (e) {
                     console.log('Erro ao escrever:', e);
                     return false;
                 }
+            };
+
+            // Adicionar novo registo de produção
+            const adicionarRegisto = async () => {
+                if (!formNovo.artigo || !formNovo.horaInicio || !formNovo.horaFim) {
+                    alert('⚠️ Preenche artigo, hora início e hora fim.');
+                    return;
+                }
+                setLoading(true);
+                try {
+                    const id = String(Date.now());
+                    const mins = calcMin(formNovo.horaInicio, formNovo.horaFim);
+                    const duracao = `${Math.floor(mins/60)}h ${mins%60}min`;
+                    
+                    // Enviar para Power Automate (mesmo formato da app de produção)
+                    try {
+                        await fetch(CONFIG.URL_ADICIONAR_PROD, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ID: id,
+                                Data: modalDados.data,
+                                Artigo: formNovo.artigo,
+                                TipoCaixa: formNovo.tipoCaixa || '',
+                                Operacao: formNovo.operacao || '',
+                                UnidadeProducao: formNovo.unidade || '',
+                                Colaborador: modalDados.colab,
+                                HoraInicio: formNovo.horaInicio,
+                                HoraFim: formNovo.horaFim,
+                                Duracao: duracao,
+                                Comentarios: formNovo.comentarios || '',
+                                DataHoraRegisto: new Date().toLocaleString('pt-PT')
+                            })
+                        });
+                    } catch (e) {
+                        console.log('Adicionar prod (provavelmente executou):', e.message);
+                    }
+                    
+                    // Adicionar localmente
+                    const novoReg = {
+                        id,
+                        data: modalDados.data,
+                        artigo: formNovo.artigo,
+                        tipoCaixa: formNovo.tipoCaixa || '',
+                        operacao: formNovo.operacao || '',
+                        unidade: formNovo.unidade || '',
+                        colaborador: modalDados.colab,
+                        horaInicio: formNovo.horaInicio,
+                        horaFim: formNovo.horaFim,
+                        duracao,
+                        comentarios: formNovo.comentarios || ''
+                    };
+                    const novos = [...registos, novoReg];
+                    setRegistos(novos);
+                    localStorage.setItem('adminRegistos', JSON.stringify(novos));
+                    
+                    // Atualizar modal
+                    const nomeLower = modalDados.colab.toLowerCase();
+                    setModalDados({
+                        ...modalDados,
+                        registos: novos.filter(r => r.colaborador.toLowerCase() === nomeLower && r.data === modalDados.data)
+                    });
+                    
+                    setAdicionando(false);
+                    setFormNovo({});
+                    alert('✅ Registo adicionado!');
+                } catch (error) {
+                    console.error('Erro ao adicionar:', error);
+                    alert('❌ Erro ao adicionar registo.');
+                }
+                setLoading(false);
+            };
+
+            // Carregar encomendas (pendentes + terminadas)
+            const carregarEncomendas = async () => {
+                setLoadingEnc(true);
+                try {
+                    const processarDados = (dados) => {
+                        return (Array.isArray(dados) ? dados : dados.value || []).map(row => ({
+                            caixa: row.Caixa || row['Caixa'] || '',
+                            tipologia: row.Tipologia || '',
+                            estado: row.Estado || '',
+                            subEstado: row.SubEstado || '',
+                            dataProducao: row['Data Produção'] || row.DataProducao || row['Data Producao'] || '',
+                            dataEmbalamento: row['Data Embalamento'] || row.DataEmbalamento || '',
+                            numSerie: row['Nº série'] || row.NumSerie || row['Nº serie'] || row['NumSerie'] || ''
+                        }));
+                    };
+                    
+                    // Carregar pendentes
+                    let pendentes = [];
+                    try {
+                        const resp1 = await fetch(CONFIG.URL_LER_ENCOMENDAS, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                        });
+                        pendentes = processarDados(await resp1.json());
+                        console.log('Encomendas pendentes:', pendentes.length);
+                    } catch (e) { console.log('Erro pendentes:', e.message); }
+                    
+                    // Carregar terminadas
+                    let terminadas = [];
+                    try {
+                        const resp2 = await fetch(CONFIG.URL_LER_TERMINADAS, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                        });
+                        const raw2 = await resp2.json();
+                        terminadas = processarDados(raw2);
+                        console.log('Encomendas terminadas:', terminadas.length);
+                        // DEBUG: mostrar formatos de data das primeiras 5 com dataProducao
+                        const comData = terminadas.filter(e => e.dataProducao).slice(0, 5);
+                        console.log('DEBUG datas terminadas:', comData.map(e => ({ caixa: e.caixa, dataProd: e.dataProducao, dataEmb: e.dataEmbalamento, tipo: typeof e.dataProducao })));
+                    } catch (e) { console.log('Erro terminadas:', e.message); }
+                    
+                    const todas = [...pendentes, ...terminadas];
+                    console.log('Total encomendas:', todas.length);
+                    setEncomendas(todas);
+                } catch (e) {
+                    console.log('Erro encomendas:', e.message);
+                }
+                setLoadingEnc(false);
+            };
+
+            // Cruzar produção com encomendas (aceita array de datas para encomendas)
+            const cruzarDados = (datasEncArr, dataRegistos) => {
+                const normalize = s => s.replace(/\s+/g, ' ').trim().toLowerCase();
+                
+                const convertDate = (dp) => {
+                    if (!dp || dp === 'sem data') return '';
+                    if (typeof dp === 'number') {
+                        const d = new Date((dp - 25569) * 86400000);
+                        return d.toISOString().split('T')[0];
+                    }
+                    if (typeof dp === 'string') {
+                        if (/^\d{4,5}$/.test(dp.trim())) {
+                            const num = parseInt(dp.trim());
+                            const d = new Date((num - 25569) * 86400000);
+                            return d.toISOString().split('T')[0];
+                        }
+                        if (dp.includes('/')) {
+                            const p = dp.split('/');
+                            if (p[2]?.length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+                        }
+                        if (dp.includes('T')) return dp.split('T')[0];
+                        if (dp.match(/^\d{4}-\d{2}-\d{2}/)) return dp.substring(0, 10);
+                    }
+                    return '';
+                };
+                
+                const datasSet = new Set(datasEncArr);
+                
+                const produzidas = {};
+                const embaladas = {};
+                
+                encomendas.forEach(e => {
+                    const dprod = convertDate(e.dataProducao);
+                    const demb = convertDate(e.dataEmbalamento);
+                    const key = normalize(e.caixa);
+                    
+                    if (dprod && datasSet.has(dprod)) {
+                        if (!produzidas[key]) produzidas[key] = { nome: e.caixa, count: 0, series: [], datas: new Set() };
+                        produzidas[key].count++;
+                        produzidas[key].datas.add(dprod);
+                        if (e.numSerie) produzidas[key].series.push(e.numSerie);
+                    }
+                    if (demb && datasSet.has(demb)) {
+                        if (!embaladas[key]) embaladas[key] = { nome: e.caixa, count: 0, series: [], datas: new Set() };
+                        embaladas[key].count++;
+                        embaladas[key].datas.add(demb);
+                        if (e.numSerie) embaladas[key].series.push(e.numSerie);
+                    }
+                });
+                
+                const regsDia = registos.filter(r => r.data === dataRegistos);
+                const regsPorArtigo = {};
+                regsDia.forEach(r => {
+                    const key = normalize(r.artigo);
+                    if (!regsPorArtigo[key]) regsPorArtigo[key] = { nome: r.artigo, operacoes: {}, colaboradores: new Set(), totalMin: 0, count: 0 };
+                    regsPorArtigo[key].count++;
+                    const op = r.operacao || 'Sem operação';
+                    if (!regsPorArtigo[key].operacoes[op]) regsPorArtigo[key].operacoes[op] = 0;
+                    regsPorArtigo[key].operacoes[op]++;
+                    regsPorArtigo[key].colaboradores.add(r.colaborador);
+                    regsPorArtigo[key].totalMin += calcMin(r.horaInicio, r.horaFim);
+                });
+                
+                return { produzidas, embaladas, regsPorArtigo };
             };
 
             // Calcular horas
@@ -883,6 +1094,7 @@
                         <button className={tab === 'matriz' ? 'active' : ''} onClick={() => setTab('matriz')}>📦 Matriz</button>
                         <button className={tab === 'equipa' ? 'active' : ''} onClick={() => setTab('equipa')}>👥 Equipa</button>
                         <button className={tab === 'ausencias' ? 'active' : ''} onClick={() => setTab('ausencias')}>🏖️ Ausências</button>
+                        <button className={tab === 'cruzamento' ? 'active' : ''} onClick={() => { setTab('cruzamento'); if (encomendas.length === 0) carregarEncomendas(); }}>🔄 Produção vs Enc.</button>
                     </div>
 
                     <div style={{ padding: '15px' }}>
@@ -1477,6 +1689,211 @@
                                 )}
                             </div>
                         )}
+
+                        {/* ==================== CRUZAMENTO PRODUÇÃO vs ENCOMENDAS ==================== */}
+                        {tab === 'cruzamento' && (() => {
+                            const dados = encomendas.length > 0 ? cruzarDados(datasEnc, dataReg) : { produzidas: {}, embaladas: {}, regsPorArtigo: {} };
+                            const { produzidas, embaladas, regsPorArtigo } = dados;
+                            const totalProd = Object.values(produzidas).reduce((a, d) => a + d.count, 0);
+                            const totalEmb = Object.values(embaladas).reduce((a, d) => a + d.count, 0);
+                            
+                            return (
+                            <div>
+                                {/* Header */}
+                                <div className="card" style={{ marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                        <h3 style={{ margin: 0, fontSize: '16px' }}>🔄 Produção vs Encomendas</h3>
+                                        <button className="btn" style={{ fontSize: '11px', padding: '6px 12px' }} onClick={carregarEncomendas} disabled={loadingEnc}>
+                                            {loadingEnc ? '⏳...' : '🔄 Carregar Encomendas'}
+                                        </button>
+                                    </div>
+                                    {encomendas.length > 0 && (
+                                        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '11px' }}>
+                                            ✅ {encomendas.length} encomendas carregadas
+                                        </div>
+                                    )}
+                                </div>
+
+                                {encomendas.length === 0 ? (
+                                    <div className="card" style={{ textAlign: 'center', color: '#64748b' }}>⚠️ Clica "Carregar Encomendas"</div>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        {/* QUADRO 1: Caixas do dia */}
+                                        <div className="card" style={{ padding: '12px' }}>
+                                            <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <h4 style={{ margin: 0, fontSize: '14px', color: '#3b82f6' }}>📋 Caixas do Dia</h4>
+                                                <span style={{ background: '#1e3a5f', color: '#93c5fd', padding: '2px 8px', borderRadius: '10px', fontSize: '11px' }}>
+                                                    {totalProd} prod. + {totalEmb} emb.
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Filtro de datas múltiplas */}
+                                            <div style={{ marginBottom: '10px', background: '#0f172a', borderRadius: '6px', padding: '8px' }}>
+                                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                                    {datasEnc.map((d, i) => (
+                                                        <span key={i} style={{ background: '#1e3a5f', color: '#93c5fd', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            {formatData(d)}
+                                                            {datasEnc.length > 1 && <span style={{ cursor: 'pointer', fontSize: '13px' }} onClick={() => setDatasEnc(datasEnc.filter((_, idx) => idx !== i))}>×</span>}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <input type="date" className="input" value={novaDataEnc} onChange={e => setNovaDataEnc(e.target.value)} style={{ padding: '4px 6px', fontSize: '11px', flex: 1 }} />
+                                                    <button className="btn" style={{ fontSize: '10px', padding: '4px 8px' }} onClick={() => {
+                                                        if (novaDataEnc && !datasEnc.includes(novaDataEnc)) {
+                                                            setDatasEnc([...datasEnc, novaDataEnc].sort());
+                                                            setNovaDataEnc('');
+                                                        }
+                                                    }}>+ Adicionar</button>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Produzidas */}
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <div style={{ fontSize: '12px', color: '#22c55e', marginBottom: '6px', fontWeight: '600' }}>🔨 Produzidas ({totalProd})</div>
+                                                {Object.keys(produzidas).length === 0 ? (
+                                                    <div style={{ color: '#475569', fontSize: '11px', padding: '8px 0' }}>Nenhuma caixa produzida</div>
+                                                ) : Object.values(produzidas).map((d, i) => (
+                                                    <div key={i} style={{ background: '#0f172a', borderRadius: '6px', padding: '8px 10px', marginBottom: '4px', borderLeft: '3px solid #22c55e' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <span style={{ fontWeight: '600', fontSize: '13px' }}>{d.nome}</span>
+                                                            <span style={{ color: '#94a3b8', fontSize: '11px' }}>×{d.count}</span>
+                                                        </div>
+                                                        {d.series.length > 0 && <div style={{ color: '#475569', fontSize: '10px', marginTop: '2px' }}>Nº série: {d.series.join(', ')}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Embaladas */}
+                                            <div>
+                                                <div style={{ fontSize: '12px', color: '#a78bfa', marginBottom: '6px', fontWeight: '600' }}>📦 Embaladas ({totalEmb})</div>
+                                                {Object.keys(embaladas).length === 0 ? (
+                                                    <div style={{ color: '#475569', fontSize: '11px', padding: '8px 0' }}>Nenhuma caixa embalada</div>
+                                                ) : Object.values(embaladas).map((d, i) => (
+                                                    <div key={i} style={{ background: '#0f172a', borderRadius: '6px', padding: '8px 10px', marginBottom: '4px', borderLeft: '3px solid #a78bfa' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <span style={{ fontWeight: '600', fontSize: '13px' }}>{d.nome}</span>
+                                                            <span style={{ color: '#94a3b8', fontSize: '11px' }}>×{d.count}</span>
+                                                        </div>
+                                                        {d.series.length > 0 && <div style={{ color: '#475569', fontSize: '10px', marginTop: '2px' }}>Nº série: {d.series.join(', ')}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* QUADRO 2: Registos do Dia */}
+                                        <div className="card" style={{ padding: '12px' }}>
+                                            <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <h4 style={{ margin: 0, fontSize: '14px', color: '#f59e0b' }}>📦 Registos do Dia</h4>
+                                                <span style={{ background: '#422006', color: '#fbbf24', padding: '2px 8px', borderRadius: '10px', fontSize: '11px' }}>
+                                                    {registos.filter(r => r.data === dataReg).length} registos
+                                                </span>
+                                            </div>
+                                            
+                                            <div style={{ marginBottom: '8px', background: '#0f172a', borderRadius: '6px', padding: '8px' }}>
+                                                <input type="date" className="input" value={dataReg} onChange={e => setDataReg(e.target.value)} style={{ padding: '4px 6px', fontSize: '11px', width: '100%' }} />
+                                            </div>
+                                            
+                                            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px' }}>Agrupado por caixa — clica para editar</div>
+                                            
+                                            {registos.filter(r => r.data === dataReg).length === 0 ? (
+                                                <div style={{ color: '#475569', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>Nenhum registo neste dia</div>
+                                            ) : (() => {
+                                                const regsDia = registos.filter(r => r.data === dataReg);
+                                                const porCaixa = {};
+                                                regsDia.forEach(r => {
+                                                    const key = r.artigo || 'Sem artigo';
+                                                    if (!porCaixa[key]) porCaixa[key] = [];
+                                                    porCaixa[key].push(r);
+                                                });
+                                                return Object.entries(porCaixa).sort((a, b) => a[0].localeCompare(b[0])).map(([caixa, regs]) => (
+                                                    <div key={caixa} style={{ marginBottom: '8px' }}>
+                                                        <div style={{ background: '#1e293b', padding: '6px 10px', borderRadius: '6px 6px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontWeight: '600', fontSize: '12px', color: '#e2e8f0' }}>{caixa}</span>
+                                                            <span style={{ color: '#64748b', fontSize: '10px' }}>{regs.length} reg. • {(regs.reduce((a, r) => a + calcMin(r.horaInicio, r.horaFim), 0) / 60).toFixed(1)}h</span>
+                                                        </div>
+                                                        {regs.sort((a, b) => (a.colaborador || '').localeCompare(b.colaborador || '') || (a.horaInicio || '').localeCompare(b.horaInicio || '')).map((r, i) => (
+                                                            <div key={r.id || i} style={{ background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
+                                                                {editCruz === r.id ? (
+                                                                    <div style={{ padding: '10px' }}>
+                                                                        <div style={{ marginBottom: '6px' }}>
+                                                                            <label style={{ fontSize: '10px', color: '#64748b' }}>Artigo</label>
+                                                                            <select className="input" value={formCruz.artigo || ''} onChange={e => {
+                                                                                const art = ARTIGOS.find(a => a.artigo === e.target.value);
+                                                                                setFormCruz({...formCruz, artigo: e.target.value, tipoCaixa: art?.tipo || formCruz.tipoCaixa});
+                                                                            }} style={{ padding: '6px', fontSize: '12px' }}>
+                                                                                <option value="">Selecionar...</option>
+                                                                                {ARTIGOS.map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
+                                                                            </select>
+                                                                        </div>
+                                                                        <div style={{ marginBottom: '6px' }}>
+                                                                            <label style={{ fontSize: '10px', color: '#64748b' }}>Operação</label>
+                                                                            <select className="input" value={formCruz.operacao || ''} onChange={e => setFormCruz({...formCruz, operacao: e.target.value})} style={{ padding: '6px', fontSize: '12px' }}>
+                                                                                <option value="">Selecionar...</option>
+                                                                                {operacoesConfig.map(op => <option key={op.operacao} value={op.operacao}>{op.operacao}</option>)}
+                                                                            </select>
+                                                                        </div>
+                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
+                                                                            <div>
+                                                                                <label style={{ fontSize: '10px', color: '#64748b' }}>Início</label>
+                                                                                <input type="time" className="input" value={formCruz.horaInicio || ''} onChange={e => setFormCruz({...formCruz, horaInicio: e.target.value})} style={{ padding: '6px', fontSize: '12px' }} />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label style={{ fontSize: '10px', color: '#64748b' }}>Fim</label>
+                                                                                <input type="time" className="input" value={formCruz.horaFim || ''} onChange={e => setFormCruz({...formCruz, horaFim: e.target.value})} style={{ padding: '6px', fontSize: '12px' }} />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                                            <button className="btn" style={{ background: '#059669', color: 'white', flex: 1, padding: '6px', fontSize: '11px' }} onClick={async () => {
+                                                                                const idStr = String(formCruz.id);
+                                                                                const mins = calcMin(formCruz.horaInicio, formCruz.horaFim);
+                                                                                const duracao = `${Math.floor(mins/60)}h ${mins%60}min`;
+                                                                                try {
+                                                                                    await fetch(CONFIG.URL_ALTERAR, {
+                                                                                        method: 'POST',
+                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                        body: JSON.stringify({
+                                                                                            id: idStr, Data: formCruz.data, Artigo: formCruz.artigo,
+                                                                                            TipoCaixa: formCruz.tipoCaixa, Operacao: formCruz.operacao,
+                                                                                            UnidadeProducao: formCruz.unidade, Colaborador: formCruz.colaborador,
+                                                                                            HoraInicio: formCruz.horaInicio, HoraFim: formCruz.horaFim,
+                                                                                            Duracao: duracao, Comentarios: formCruz.comentarios || ''
+                                                                                        })
+                                                                                    });
+                                                                                } catch(e) { console.log('Alterar (provavelmente ok):', e.message); }
+                                                                                let done = false;
+                                                                                const novos = registos.map(reg => {
+                                                                                    if (!done && String(reg.id) === idStr) { done = true; return {...formCruz, duracao}; }
+                                                                                    return reg;
+                                                                                });
+                                                                                setRegistos(novos);
+                                                                                localStorage.setItem('adminRegistos', JSON.stringify(novos));
+                                                                                setEditCruz(null);
+                                                                                alert('✅ Registo atualizado!');
+                                                                            }}>💾 Guardar</button>
+                                                                            <button className="btn btn-secondary" style={{ padding: '6px', fontSize: '11px' }} onClick={() => setEditCruz(null)}>Cancelar</button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div style={{ padding: '6px 10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onClick={() => { setEditCruz(r.id); setFormCruz({...r}); }}>
+                                                                        <div>
+                                                                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{r.operacao}</span>
+                                                                            <div style={{ fontSize: '10px', color: '#64748b' }}>{r.colaborador} • {r.horaInicio}-{r.horaFim} • {r.unidade}</div>
+                                                                        </div>
+                                                                        <span style={{ color: '#475569', fontSize: '10px' }}>✏️</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            );
+                        })()}
                     </div>
 
                     {/* Modal de detalhes */}
@@ -1566,6 +1983,75 @@
                                                 </div>
                                             ))}
                                         </>
+                                    )}
+                                    
+                                    {/* Adicionar registo */}
+                                    {!adicionando ? (
+                                        <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                                            <button className="btn" style={{ background: '#059669', color: 'white', padding: '8px 16px', fontSize: '12px', borderRadius: '8px', width: '100%' }} onClick={() => { setAdicionando(true); setFormNovo({ data: modalDados.data, colaborador: modalDados.colab }); }}>
+                                                ➕ Adicionar Registo
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ marginTop: '12px', background: '#064e3b', borderRadius: '8px', padding: '12px' }}>
+                                            <div style={{ marginBottom: '8px', color: '#6ee7b7', fontSize: '13px', fontWeight: '600' }}>➕ Novo Registo</div>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Tipo</label>
+                                                <select className="input" value={formNovo.tipoCaixa || ''} onChange={e => setFormNovo({...formNovo, tipoCaixa: e.target.value, artigo: '', operacao: ''})} style={{ padding: '8px', fontSize: '12px' }}>
+                                                    <option value="">Selecionar tipo...</option>
+                                                    {TIPOS.map(t => <option key={t.id} value={t.id}>{t.icon} {t.nome}</option>)}
+                                                </select>
+                                            </div>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Artigo</label>
+                                                <select className="input" value={formNovo.artigo || ''} onChange={e => {
+                                                    const art = ARTIGOS.find(a => a.artigo === e.target.value);
+                                                    setFormNovo({...formNovo, artigo: e.target.value, tipoCaixa: art?.tipo || formNovo.tipoCaixa});
+                                                }} style={{ padding: '8px', fontSize: '12px' }}>
+                                                    <option value="">Selecionar artigo...</option>
+                                                    {ARTIGOS.filter(a => !formNovo.tipoCaixa || a.tipo === formNovo.tipoCaixa).map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
+                                                </select>
+                                            </div>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Operação</label>
+                                                <select className="input" value={formNovo.operacao || ''} onChange={e => setFormNovo({...formNovo, operacao: e.target.value})} style={{ padding: '8px', fontSize: '12px' }}>
+                                                    <option value="">Selecionar operação...</option>
+                                                    {operacoesConfig.filter(op => !formNovo.artigo || !op.artigos || op.artigos.includes(formNovo.artigo)).map(op => <option key={op.operacao} value={op.operacao}>{op.operacao}</option>)}
+                                                </select>
+                                            </div>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Unidade Produção</label>
+                                                <select className="input" value={formNovo.unidade || ''} onChange={e => setFormNovo({...formNovo, unidade: e.target.value})} style={{ padding: '8px', fontSize: '12px' }}>
+                                                    <option value="">Selecionar unidade...</option>
+                                                    <option value="Evora1-Montagem">Evora1-Montagem</option>
+                                                    <option value="Evora1-Soldadura">Evora1-Soldadura</option>
+                                                    <option value="Evora1-Embalamento">Evora1-Embalamento</option>
+                                                    <option value="Transportes">Transportes</option>
+                                                </select>
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                                                <div>
+                                                    <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Hora Início</label>
+                                                    <input type="time" className="input" value={formNovo.horaInicio || ''} onChange={e => setFormNovo({...formNovo, horaInicio: e.target.value})} style={{ padding: '8px', fontSize: '12px' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Hora Fim</label>
+                                                    <input type="time" className="input" value={formNovo.horaFim || ''} onChange={e => setFormNovo({...formNovo, horaFim: e.target.value})} style={{ padding: '8px', fontSize: '12px' }} />
+                                                </div>
+                                            </div>
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Comentários</label>
+                                                <input className="input" value={formNovo.comentarios || ''} onChange={e => setFormNovo({...formNovo, comentarios: e.target.value})} placeholder="Opcional" style={{ padding: '8px', fontSize: '12px' }} />
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button className="btn" style={{ background: '#059669', color: 'white', flex: 1, padding: '8px', fontSize: '12px' }} onClick={adicionarRegisto} disabled={loading}>
+                                                    {loading ? '⏳' : '💾'} Guardar
+                                                </button>
+                                                <button className="btn btn-secondary" style={{ padding: '8px', fontSize: '12px' }} onClick={() => { setAdicionando(false); setFormNovo({}); }}>
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
                                     
                                     {/* Perturbações */}
