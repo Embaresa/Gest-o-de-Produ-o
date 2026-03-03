@@ -1,4 +1,4 @@
-const CACHE_NAME = 'admin-producao-v1';
+const CACHE_NAME = 'admin-producao-v2';
 const urlsToCache = [
     './admin.html',
     './manifest-admin.json',
@@ -27,7 +27,14 @@ self.addEventListener('activate', event => {
 });
 
 // Fetch - Network first, fallback to cache
+// POST requests (Power Automate) vão direto para a rede, sem cache
 self.addEventListener('fetch', event => {
+    // Não interferir com POSTs (chamadas ao Power Automate)
+    if (event.request.method !== 'GET') {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         fetch(event.request)
             .then(response => {
