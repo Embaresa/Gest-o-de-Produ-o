@@ -807,14 +807,20 @@
             // Função para escrever no Excel via Power Automate
             const escreverConfig = async (acao, tabela, dados) => {
                 try {
-                    await fetch(CONFIG.URL_ESCREVER_CONFIG, {
+                    console.log('📤 escreverConfig:', JSON.stringify({ acao, tabela, dados }));
+                    const resp = await fetch(CONFIG.URL_ESCREVER_CONFIG, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ acao, tabela, dados })
                     });
+                    console.log('📥 escreverConfig resposta status:', resp.status);
+                    try {
+                        const txt = await resp.text();
+                        console.log('📥 escreverConfig resposta body:', txt.substring(0, 500));
+                    } catch(e2) {}
                     return true;
                 } catch (e) {
-                    console.log('Erro ao escrever:', e);
+                    console.log('❌ Erro ao escrever:', e);
                     return false;
                 }
             };
@@ -1728,6 +1734,7 @@
                                         document.getElementById('ausNome').value = '';
                                         document.getElementById('ausTipo').value = '';
                                         // Sincronizar com Excel
+                                        console.log('🔄 A sincronizar ausência:', { ausId, nome, tipo, ini, fim });
                                         const ok = await escreverConfig('adicionar', 'ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
                                         if (ok) alert('✅ Ausência registada e sincronizada!');
                                         else alert('✅ Ausência registada localmente (erro na sincronização com Excel).');
