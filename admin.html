@@ -1735,7 +1735,7 @@
                                         document.getElementById('ausTipo').value = '';
                                         // Sincronizar com Excel
                                         console.log('🔄 A sincronizar ausência:', { ausId, nome, tipo, ini, fim });
-                                        const ok = await escreverConfig('adicionar', 'ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
+                                        const ok = await escreverConfig('adicionar', 'Ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
                                         if (ok) alert('✅ Ausência registada e sincronizada!');
                                         else alert('✅ Ausência registada localmente (erro na sincronização com Excel).');
                                     }}>Registar</button>
@@ -1753,7 +1753,7 @@
                                                 <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={async () => {
                                                     if (!confirm('Eliminar ausência de ' + a.nome + '?')) return;
                                                     setAusencias(ausencias.filter(x => x.id !== a.id));
-                                                    const ok = await escreverConfig('eliminar', 'ausencias', { ID: String(a.id), Nome: a.nome, Tipo: a.tipo, DataInicio: a.dataInicio, DataFim: a.dataFim });
+                                                    const ok = await escreverConfig('eliminar', 'Ausencias', { ID: String(a.id), Nome: a.nome, Tipo: a.tipo, DataInicio: a.dataInicio, DataFim: a.dataFim });
                                                     if (ok) alert('✅ Ausência eliminada e sincronizada!');
                                                     else alert('⚠️ Removida localmente mas erro na sincronização.');
                                                 }}>🗑️</button>

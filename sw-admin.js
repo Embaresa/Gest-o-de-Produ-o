@@ -1,4 +1,4 @@
-const CACHE_NAME = 'admin-producao-v2';
+const CACHE_NAME = 'admin-producao-v3';
 const urlsToCache = [
     './admin.html',
     './manifest-admin.json',
