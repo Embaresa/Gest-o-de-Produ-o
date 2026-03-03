@@ -1717,16 +1717,20 @@
                                         <input type="date" className="input" id="ausIni" />
                                         <input type="date" className="input" id="ausFim" />
                                     </div>
-                                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => {
+                                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={async () => {
                                         const nome = document.getElementById('ausNome').value;
                                         const tipo = document.getElementById('ausTipo').value;
                                         const ini = document.getElementById('ausIni').value;
                                         const fim = document.getElementById('ausFim').value;
                                         if (!nome || !tipo || !ini || !fim) { alert('Preencha tudo!'); return; }
-                                        setAusencias([...ausencias, { id: Date.now(), nome, tipo, dataInicio: ini, dataFim: fim }]);
+                                        const ausId = String(Date.now());
+                                        setAusencias([...ausencias, { id: ausId, nome, tipo, dataInicio: ini, dataFim: fim }]);
                                         document.getElementById('ausNome').value = '';
                                         document.getElementById('ausTipo').value = '';
-                                        alert('✅ Ausência registada!');
+                                        // Sincronizar com Excel
+                                        const ok = await escreverConfig('adicionar', 'ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
+                                        if (ok) alert('✅ Ausência registada e sincronizada!');
+                                        else alert('✅ Ausência registada localmente (erro na sincronização com Excel).');
                                     }}>Registar</button>
                                 </div>
 
@@ -1739,7 +1743,13 @@
                                                     <div style={{ fontWeight: '600' }}>{a.nome}</div>
                                                     <div style={{ color: '#64748b' }}>{a.tipo} • {formatData(a.dataInicio)} → {formatData(a.dataFim)}</div>
                                                 </div>
-                                                <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setAusencias(ausencias.filter(x => x.id !== a.id))}>🗑️</button>
+                                                <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={async () => {
+                                                    if (!confirm('Eliminar ausência de ' + a.nome + '?')) return;
+                                                    setAusencias(ausencias.filter(x => x.id !== a.id));
+                                                    const ok = await escreverConfig('eliminar', 'ausencias', { ID: String(a.id), Nome: a.nome, Tipo: a.tipo, DataInicio: a.dataInicio, DataFim: a.dataFim });
+                                                    if (ok) alert('✅ Ausência eliminada e sincronizada!');
+                                                    else alert('⚠️ Removida localmente mas erro na sincronização.');
+                                                }}>🗑️</button>
                                             </div>
                                         ))}
                                     </div>
