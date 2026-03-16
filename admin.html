@@ -274,6 +274,10 @@
                 return s ? JSON.parse(s) : [];
             });
 
+            const [pins, setPins] = useState(() => {
+                const s = localStorage.getItem('adminPins');
+                return s ? JSON.parse(s) : {};
+            });
             const [ferias, setFerias] = useState(() => {
                 const s = localStorage.getItem('adminFerias');
                 return s ? JSON.parse(s) : [];
@@ -306,6 +310,7 @@
 
             // Persistência
             useEffect(() => { localStorage.setItem('adminColabs', JSON.stringify(colaboradores)); }, [colaboradores]);
+            useEffect(() => { localStorage.setItem('adminPins', JSON.stringify(pins)); }, [pins]);
             useEffect(() => { localStorage.setItem('adminArtigosConfig', JSON.stringify(artigosConfig)); }, [artigosConfig]);
             useEffect(() => { localStorage.setItem('adminOperacoesConfig', JSON.stringify(operacoesConfig)); }, [operacoesConfig]);
             useEffect(() => { localStorage.setItem('adminAusencias', JSON.stringify(ausencias)); }, [ausencias]);
@@ -417,8 +422,9 @@
                         setRegistos(regsUnicos);
                         localStorage.setItem('adminRegistos', JSON.stringify(regsUnicos));
                         
-                        // Mapa será guardado manualmente via tab Horas
-                        // (removido envio automático para evitar duplicados)
+                        // Guardar mapa de horas do mês atual automaticamente (em background)
+                        const mesHoje = new Date().toISOString().slice(0, 7);
+                        setTimeout(() => guardarMapaAuto(mesHoje, regsUnicos, true), 3000);
                     }
 
                     // Carregar perturbações
@@ -497,11 +503,13 @@
                         // Colaboradores
                         if (dataConfig.colaboradores && dataConfig.colaboradores.length > 0) {
                             const colabs = dataConfig.colaboradores.map(c => ({
+                                id: c.ID || c.id || '',
                                 nome: c.Nome || c.nome || '',
                                 turno: (c.Turno || c.turno || 'normal').toLowerCase(),
                                 dias: (c.DiasTrabalho || c.diasTrabalho || 'seg,ter,qua,qui,sex').toLowerCase().split(','),
                                 ativo: (c.Ativo || c.ativo || 'Sim') === 'Sim',
-                                dataSaida: c.DataSaida || c.dataSaida || ''
+                                dataSaida: c.DataSaida || c.dataSaida || '',
+                                pin: c.PIN || c.pin || ''
                             })).filter(c => c.nome);
                             console.log('Colaboradores carregados:', colabs.length);
                             setColaboradores(colabs);
@@ -562,6 +570,19 @@
                             localStorage.setItem('adminMesesGuardados', JSON.stringify(meses));
                         }
                         
+                        // PINs
+                        if (dataConfig.pins && dataConfig.pins.length > 0) {
+                            const pinsObj = {};
+                            dataConfig.pins.forEach(p => {
+                                const id = p.ID || p.id;
+                                const pin = p.PIN || p.pin || p.Pin;
+                                if (id && pin) pinsObj[String(id)] = String(pin);
+                            });
+                            console.log('PINs carregados:', Object.keys(pinsObj).length);
+                            setPins(pinsObj);
+                            localStorage.setItem('adminPins', JSON.stringify(pinsObj));
+                        }
+
                         // Feriados
                         if (dataConfig.feriados && dataConfig.feriados.length > 0) {
                             const fers = dataConfig.feriados.map(f => {
@@ -771,12 +792,14 @@
             };
 
             // Função para guardar mapa de horas automaticamente
-            const guardarMapaAuto = async (mes, registosData) => {
-                // Verificar se já foi guardado (usar localStorage direto para evitar estado stale)
-                const guardados = JSON.parse(localStorage.getItem('adminMesesGuardados') || '[]');
-                if (guardados.includes(mes)) {
-                    console.log('Mês', mes, 'já guardado, ignorando...');
-                    return;
+            const guardarMapaAuto = async (mes, registosData, forcar = false) => {
+                // Se não forçar, verificar se já foi guardado
+                if (!forcar) {
+                    const guardados = JSON.parse(localStorage.getItem('adminMesesGuardados') || '[]');
+                    if (guardados.includes(mes)) {
+                        console.log('Mês', mes, 'já guardado, ignorando...');
+                        return;
+                    }
                 }
                 
                 const [ano, mesNum] = mes.split('-');
@@ -1133,6 +1156,7 @@
                         <button className={tab === 'matriz' ? 'active' : ''} onClick={() => setTab('matriz')}>📦 Matriz</button>
                         <button className={tab === 'equipa' ? 'active' : ''} onClick={() => setTab('equipa')}>👥 Equipa</button>
                         <button className={tab === 'ausencias' ? 'active' : ''} onClick={() => setTab('ausencias')}>🏖️ Ausências</button>
+                        <button className={tab === 'pins' ? 'active' : ''} onClick={() => setTab('pins')}>🔑 PINs</button>
                         <button className={tab === 'cruzamento' ? 'active' : ''} onClick={() => { setTab('cruzamento'); if (encomendas.length === 0) carregarEncomendas(); }}>🔄 Produção vs Enc.</button>
                     </div>
 
@@ -1649,13 +1673,16 @@
                                         const turno = document.getElementById('novoColabTurno').value;
                                         if (!nome) { alert('Preencha o nome!'); return; }
                                         if (colaboradores.find(c => c.nome.toLowerCase() === nome.toLowerCase())) { alert('Colaborador já existe!'); return; }
-                                        const novoColab = { nome, turno, ativo: true, dias: ['seg','ter','qua','qui','sex'] };
+                                        // Calcular próximo ID
+                                        const maxId = colaboradores.reduce((max, c) => Math.max(max, parseInt(c.id) || 0), 0);
+                                        const novoId = maxId + 1;
+                                        const novoColab = { id: novoId, nome, turno, ativo: true, dias: ['seg','ter','qua','qui','sex'] };
                                         const novos = [...colaboradores, novoColab];
                                         setColaboradores(novos);
                                         document.getElementById('novoColabNome').value = '';
                                         document.getElementById('novoColabTurno').value = 'normal';
                                         // Sincronizar com Excel
-                                        const ok = await escreverConfig('adicionar', 'colaboradores', { Nome: nome, Turno: turno, Ativo: 'true', DiasTrabalho: 'seg,ter,qua,qui,sex', SemanaInicioTurno1: '1' });
+                                        const ok = await escreverConfig('adicionar', 'colaboradores', { ID: String(novoId), Nome: nome, Turno: turno, Ativo: 'Sim', DiasTrabalho: 'seg,ter,qua,qui,sex', SemanaInicioTurno1: '1' });
                                         if (ok) alert('✅ Colaborador adicionado e sincronizado!');
                                         else alert('✅ Colaborador adicionado localmente (erro na sincronização com Excel).');
                                     }}>Adicionar</button>
@@ -1685,31 +1712,18 @@
                                                             novos[i].dataSaida = '';
                                                         }
                                                         setColaboradores([...novos]);
-                                                        await escreverConfig('atualizar', 'colaboradores', { Nome: c.nome, Ativo: String(novos[i].ativo), DataSaida: novos[i].dataSaida || '' });
+                                                        await escreverConfig('adicionar', 'atualizar_colaboradores', { ID: String(c.id || ''), Nome: c.nome, Ativo: String(novos[i].ativo), DataSaida: novos[i].dataSaida || '' });
                                                     }}
                                                 >
                                                     {c.ativo ? '✓ Ativo' : `Inativo${c.dataSaida ? ' ('+c.dataSaida+')' : ''}`}
                                                 </button>
-                                                <button
-                                                    className="btn btn-danger"
-                                                    style={{ padding: '4px 10px', fontSize: '11px' }}
-                                                    onClick={async () => {
-                                                        if (!confirm('Eliminar "' + c.nome + '"?')) return;
-                                                        const novos = colaboradores.filter((_, idx) => idx !== i);
-                                                        setColaboradores(novos);
-                                                        const ok = await escreverConfig('eliminar', 'colaboradores', { Nome: c.nome });
-                                                        if (ok) alert('✅ ' + c.nome + ' eliminado!');
-                                                        else alert('⚠️ Removido localmente mas erro na sincronização.');
-                                                    }}
-                                                >
-                                                    🗑️
-                                                </button>
+
                                                 <button
                                                     className="btn btn-primary"
                                                     style={{ padding: '4px 10px', fontSize: '11px' }}
                                                     onClick={async () => {
                                                         const colab = colaboradores[i];
-                                                        const ok = await escreverConfig('atualizar', 'colaboradores', { Nome: colab.nome, Turno: colab.turno, Ativo: String(colab.ativo), DiasTrabalho: (colab.dias || []).join(','), DataSaida: colab.dataSaida || '' });
+                                                        const ok = await escreverConfig('adicionar', 'atualizar_colaboradores', { ID: String(colab.id || ''), Nome: colab.nome, Turno: colab.turno, Ativo: String(colab.ativo), DiasTrabalho: (colab.dias || []).join(','), DataSaida: colab.dataSaida || '' });
                                                         if (ok) alert('✅ ' + colab.nome + ' sincronizado!');
                                                         else alert('⚠️ Erro na sincronização.');
                                                     }}
@@ -2016,7 +2030,58 @@
                         })()}
                     </div>
 
-                    {/* Modal de detalhes */}
+                        {/* ==================== PINs ==================== */}
+                        {tab === 'pins' && (
+                            <div>
+                                <div className="card" style={{ marginBottom: '15px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>🔑 Gestão de PINs</div>
+                                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
+                                        Defina o PIN de 4 dígitos para cada colaborador. O PIN é usado para aceder à app de registo de produção.
+                                    </div>
+                                    {colaboradores.map((c, i) => (
+                                        <div key={i} className="card" style={{ marginBottom: '8px', padding: '10px 12px', opacity: c.ativo ? 1 : 0.5 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{ fontWeight: '600', fontSize: '13px', flex: 1 }}>{c.nome} {!c.ativo && <span style={{ color: '#ef4444', fontSize: '10px' }}>(inativo)</span>}</span>
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                    <input
+                                                        type="password"
+                                                        maxLength="4"
+                                                        placeholder="PIN"
+                                                        defaultValue={c.pin || ''}
+                                                        id={`pin_colab_${c.id}`}
+                                                        style={{ width: '70px', padding: '6px', border: '2px solid #334155', borderRadius: '8px', background: '#0f172a', color: '#e2e8f0', fontSize: '14px', textAlign: 'center', letterSpacing: '4px' }}
+                                                        onInput={e => { if(e.target.value.length > 4) e.target.value = e.target.value.slice(0,4); }}
+                                                    />
+                                                    <button className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '11px' }} onClick={async () => {
+                                                        const el = document.getElementById('pin_colab_' + c.id);
+                                                        const novoPin = el.value.trim();
+                                                        if (novoPin.length !== 4 || !/^\d{4}$/.test(novoPin)) { alert('O PIN deve ter exatamente 4 dígitos!'); return; }
+                                                        // Verificar PIN duplicado
+                                                        const duplicado = colaboradores.find(x => String(x.id) !== String(c.id) && x.pin === novoPin);
+                                                        if (duplicado) { alert('⚠️ PIN já em uso por ' + duplicado.nome + '!'); return; }
+                                                        // Atualizar colaborador localmente
+                                                        const novos = [...colaboradores];
+                                                        novos[i] = { ...novos[i], pin: novoPin };
+                                                        setColaboradores(novos);
+                                                        const ok = await escreverConfig('adicionar', 'atualizar_colaboradores', { ID: String(c.id), Nome: c.nome, Turno: c.turno, Ativo: String(c.ativo), DiasTrabalho: (c.dias||[]).join(','), DataSaida: c.dataSaida||'', PIN: novoPin });
+                                                        if (ok) alert('✅ PIN de ' + c.nome.split(' ')[0] + ' atualizado!');
+                                                        else alert('✅ PIN guardado localmente (erro na sincronização).');
+                                                    }}>💾</button>
+                                                </div>
+                                            </div>
+                                            {c.pin && (
+                                                <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>✓ PIN configurado</div>
+                                            )}
+                                            {!c.pin && (
+                                                <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>⚠️ Sem PIN definido</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                    {/* Modal de detalhes */}}
                     {modalAberto && (
                         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
                             <div style={{ background: '#1e293b', borderRadius: '12px', width: '100%', maxWidth: '500px', maxHeight: '80vh', overflow: 'auto' }}>
