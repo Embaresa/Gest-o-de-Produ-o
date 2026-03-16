@@ -47,6 +47,7 @@
         .cel-azul { background: #1d4ed8; }
         .cel-roxo { background: #5b21b6; }
         .cel-cinza { background: #334155; }
+        .cel-ferias { background: #0e7490; }
         .nome-col { text-align: left !important; min-width: 120px; background: #1e293b; position: sticky; left: 0; }
     </style>
 </head>
@@ -273,6 +274,10 @@
                 return s ? JSON.parse(s) : [];
             });
 
+            const [ferias, setFerias] = useState(() => {
+                const s = localStorage.getItem('adminFerias');
+                return s ? JSON.parse(s) : [];
+            });
             const [ausencias, setAusencias] = useState(() => {
                 const s = localStorage.getItem('adminAusencias');
                 return s ? JSON.parse(s) : [];
@@ -304,6 +309,7 @@
             useEffect(() => { localStorage.setItem('adminArtigosConfig', JSON.stringify(artigosConfig)); }, [artigosConfig]);
             useEffect(() => { localStorage.setItem('adminOperacoesConfig', JSON.stringify(operacoesConfig)); }, [operacoesConfig]);
             useEffect(() => { localStorage.setItem('adminAusencias', JSON.stringify(ausencias)); }, [ausencias]);
+            useEffect(() => { localStorage.setItem('adminFerias', JSON.stringify(ferias)); }, [ferias]);
             useEffect(() => { localStorage.setItem('adminMesesGuardados', JSON.stringify(mesesGuardados)); }, [mesesGuardados]);
             useEffect(() => { localStorage.setItem('adminFeriados', JSON.stringify(feriados)); }, [feriados]);
 
@@ -494,7 +500,8 @@
                                 nome: c.Nome || c.nome || '',
                                 turno: (c.Turno || c.turno || 'normal').toLowerCase(),
                                 dias: (c.DiasTrabalho || c.diasTrabalho || 'seg,ter,qua,qui,sex').toLowerCase().split(','),
-                                ativo: (c.Ativo || c.ativo || 'Sim') === 'Sim'
+                                ativo: (c.Ativo || c.ativo || 'Sim') === 'Sim',
+                                dataSaida: c.DataSaida || c.dataSaida || ''
                             })).filter(c => c.nome);
                             console.log('Colaboradores carregados:', colabs.length);
                             setColaboradores(colabs);
@@ -573,6 +580,28 @@
                             localStorage.setItem('adminFeriados', JSON.stringify(fers));
                         }
                         
+                        // Férias aprovadas (folha Ferias com DiasIndividuais)
+                        if (dataConfig.ferias && dataConfig.ferias.length > 0) {
+                            const feriasProcessadas = [];
+                            dataConfig.ferias.forEach(f => {
+                                const nome = f.Colaborador || f.colaborador || '';
+                                const estado = (f.Estado || f.estado || '').toLowerCase();
+                                const diasStr = f.DiasIndividuais || f.diasIndividuais || '';
+                                if (!nome || !diasStr) return;
+                                // só mostrar aprovadas
+                                if (estado && estado !== 'aprovado' && estado !== 'aprovada') return;
+                                diasStr.split(';').forEach(d => {
+                                    const dia = d.trim();
+                                    if (/^\d{4}-\d{2}-\d{2}$/.test(dia)) {
+                                        feriasProcessadas.push({ id: 'fer_' + nome + '_' + dia, nome, dataInicio: dia, dataFim: dia, tipo: 'Férias' });
+                                    }
+                                });
+                            });
+                            console.log('Férias aprovadas carregadas:', feriasProcessadas.length);
+                            setFerias(feriasProcessadas);
+                            localStorage.setItem('adminFerias', JSON.stringify(feriasProcessadas));
+                        }
+
                     } catch (errConfig) {
                         console.log('Erro ao carregar configurações:', errConfig);
                     }
@@ -1031,7 +1060,10 @@
             const getStatusDia = (colab, data) => {
                 const ds = getDiaSemana(data);
                 if (eFeriado(data) || feriados.find(f => f.data === data)) return 'feriado';
-                if (ausencias.find(a => a.nome === colab.nome && data >= a.dataInicio && data <= a.dataFim)) return 'ausencia';
+                const ausenciaMatch = ausencias.find(a => a.nome === colab.nome && data >= a.dataInicio && data <= a.dataFim);
+                if (ausenciaMatch) return (ausenciaMatch.tipo || '').toLowerCase().includes('ferias') || (ausenciaMatch.tipo || '').toLowerCase().includes('férias') ? 'ferias' : 'ausencia';
+                if (ferias.find(f => f.nome === colab.nome && f.dataInicio === data)) return 'ferias';
+                if (ferias.find(f => f.nome === colab.nome && f.dataInicio === data)) return 'ferias';
                 if (ds === 'sab' || ds === 'dom') return 'fds';
                 if (!colab.dias?.includes(ds)) return 'folga';
                 
@@ -1198,6 +1230,7 @@
                                         <span>🟡 Parcial</span>
                                         <span>🔴 Sem registo</span>
                                         <span>🔵 Ausência</span>
+                                        <span>🏖️ Férias</span>
                                         <span>🟣 Feriado</span>
                                         <span>⚫ FDS/Folga</span>
                                     </div>
@@ -1231,6 +1264,7 @@
                                                         else if (status === 'parcial') cls = 'cel-amarelo';
                                                         else if (status === 'semregisto') cls = 'cel-vermelho';
                                                         else if (status === 'ausencia') cls = 'cel-azul';
+                                        else if (status === 'ferias') cls = 'cel-ferias';
                                                         else if (status === 'feriado') cls = 'cel-roxo';
                                                         // Sábado trabalhado = amarelo
                                                         if (ds === 'sab' && horas > 0) cls = 'cel-amarelo';
@@ -1239,8 +1273,8 @@
                                                             <td key={d} className={cls} 
                                                                 style={{ cursor: 'pointer' }}
                                                                 onClick={() => abrirDetalhe(colab, d)}
-                                                                title={`${colab.nome}\n${formatData(d)}\n${horas.toFixed(1)}h - Clique para ver`}>
-                                                                {horas > 0 ? horas.toFixed(0) : ''}
+                                                                title={status === 'ferias' ? '🏖️ Férias' : status === 'ausencia' ? '🔵 Ausência' : `${horas.toFixed(1)}h`}>
+                                                                {status === 'ferias' ? '🏖' : horas > 0 ? horas.toFixed(0) : ''}
                                                             </td>
                                                         );
                                                     })}
@@ -1637,12 +1671,24 @@
                                                     style={{ padding: '4px 10px', fontSize: '11px' }}
                                                     onClick={async () => {
                                                         const novos = [...colaboradores];
-                                                        novos[i].ativo = !novos[i].ativo;
-                                                        setColaboradores(novos);
-                                                        await escreverConfig('atualizar', 'colaboradores', { Nome: c.nome, Ativo: String(novos[i].ativo) });
+                                                        if (novos[i].ativo) {
+                                                            // A desativar — pedir data de saída
+                                                            const hoje = new Date().toISOString().split('T')[0];
+                                                            const data = prompt(`Data de saída de ${c.nome}:\n(formato AAAA-MM-DD)`, hoje);
+                                                            if (!data) return; // cancelou
+                                                            if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { alert('Formato inválido! Use AAAA-MM-DD'); return; }
+                                                            novos[i].ativo = false;
+                                                            novos[i].dataSaida = data;
+                                                        } else {
+                                                            // A reativar
+                                                            novos[i].ativo = true;
+                                                            novos[i].dataSaida = '';
+                                                        }
+                                                        setColaboradores([...novos]);
+                                                        await escreverConfig('atualizar', 'colaboradores', { Nome: c.nome, Ativo: String(novos[i].ativo), DataSaida: novos[i].dataSaida || '' });
                                                     }}
                                                 >
-                                                    {c.ativo ? '✓ Ativo' : 'Inativo'}
+                                                    {c.ativo ? '✓ Ativo' : `Inativo${c.dataSaida ? ' ('+c.dataSaida+')' : ''}`}
                                                 </button>
                                                 <button
                                                     className="btn btn-danger"
@@ -1663,7 +1709,7 @@
                                                     style={{ padding: '4px 10px', fontSize: '11px' }}
                                                     onClick={async () => {
                                                         const colab = colaboradores[i];
-                                                        const ok = await escreverConfig('atualizar', 'colaboradores', { Nome: colab.nome, Turno: colab.turno, Ativo: String(colab.ativo), DiasTrabalho: (colab.dias || []).join(',') });
+                                                        const ok = await escreverConfig('atualizar', 'colaboradores', { Nome: colab.nome, Turno: colab.turno, Ativo: String(colab.ativo), DiasTrabalho: (colab.dias || []).join(','), DataSaida: colab.dataSaida || '' });
                                                         if (ok) alert('✅ ' + colab.nome + ' sincronizado!');
                                                         else alert('⚠️ Erro na sincronização.');
                                                     }}
