@@ -139,16 +139,26 @@
             "Transporte"
         ];
 
-        const TIPOS = [
-            { id: "E2", nome: "E2", icon: "✈️", cor: "#3b82f6" },
-            { id: "E2-Frac", nome: "E2 - Frações", icon: "📦", cor: "#60a5fa" },
-            { id: "KC390", nome: "KC390", icon: "✈️", cor: "#10b981" },
-            { id: "KC390-Frac", nome: "KC390 - Frações", icon: "📦", cor: "#34d399" },
-            { id: "Praetor", nome: "Praetor", icon: "✈️", cor: "#8b5cf6" },
-            { id: "E1-Frac", nome: "E1 - Frações", icon: "📦", cor: "#f59e0b" },
-            { id: "Maquinacao", nome: "Maquinação", icon: "⚙️", cor: "#6b7280" },
-            { id: "Transporte", nome: "Transportes", icon: "🚛", cor: "#ef4444" }
-        ];
+        const TIPOS_CORES = {
+            "E2": { icon: "✈️", cor: "#3b82f6" },
+            "E2-Frac": { icon: "📦", cor: "#60a5fa" },
+            "KC390": { icon: "✈️", cor: "#10b981" },
+            "KC390-Frac": { icon: "📦", cor: "#34d399" },
+            "Praetor": { icon: "✈️", cor: "#8b5cf6" },
+            "E1-Frac": { icon: "📦", cor: "#f59e0b" },
+            "Maquinacao": { icon: "⚙️", cor: "#6b7280" },
+            "Transporte": { icon: "🚛", cor: "#ef4444" }
+        };
+        const CORES_PADRAO = ["#3b82f6","#10b981","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#f97316","#ec4899","#84cc16","#6b7280"];
+        const getTipos = (artigosConfig) => {
+            const programasUnicos = [...new Set(artigosConfig.map(a => a.tipo).filter(Boolean))];
+            return programasUnicos.map((id, i) => ({
+                id,
+                nome: id,
+                icon: TIPOS_CORES[id]?.icon || "📦",
+                cor: TIPOS_CORES[id]?.cor || CORES_PADRAO[i % CORES_PADRAO.length]
+            }));
+        };
 
         const TURNOS = {
             'turno1': { nome: 'Turno 1', horas: 7.5 },
@@ -254,6 +264,8 @@
                 return s ? JSON.parse(s) : OPERACOES.map(op => ({ operacao: op, unidade: 'Evora1-Montagem', artigos: '' }));
             });
 
+            const TIPOS = getTipos(artigosConfig);
+
             const [colaboradores, setColaboradores] = useState(() => {
                 const s = localStorage.getItem('adminColabs');
                 return s ? JSON.parse(s) : COLABORADORES;
@@ -297,6 +309,17 @@
             const [formOp, setFormOp] = useState({ operacao: '', unidade: '', artigos: '' });
             const [formEdit, setFormEdit] = useState({});
             const [modalDados, setModalDados] = useState({ colab: '', data: '', registos: [] });
+            const [adicionandoPert, setAdicionandoPert] = useState(false);
+            const [editandoPert, setEditandoPert] = useState(null);
+            const [formPert, setFormPert] = useState({ tipo: '', horaInicio: '', horaFim: '' });
+            const [mesFeriasIdx, setMesFeriasIdx] = useState(new Date().getMonth());
+            const [tiposPerturbacao, setTiposPerturbacao] = useState(() => {
+                const s = localStorage.getItem('adminTiposPerturbacao');
+                return s ? JSON.parse(s) : ['Avaria de máquina','Falta de material','Reunião','Formação','Limpeza','Outro'];
+            });
+            const [anoFerias, setAnoFerias] = useState(new Date().getFullYear());
+            const [adicionandoAus, setAdicionandoAus] = useState(false);
+            const [ausPopup, setAusPopup] = useState(null); // { nome, data, ausencias[] }
 
             const [feriados, setFeriados] = useState(() => {
                 const s = localStorage.getItem('adminFeriados');
@@ -508,7 +531,19 @@
                                 turno: (c.Turno || c.turno || 'normal').toLowerCase(),
                                 dias: (c.DiasTrabalho || c.diasTrabalho || 'seg,ter,qua,qui,sex').toLowerCase().split(','),
                                 ativo: (() => { const v = String(c.Ativo || c.ativo || 'true').toLowerCase(); return v === 'true' || v === 'sim' || v === 'verdadeiro'; })(),
-                                dataSaida: c.DataSaida || c.dataSaida || '',
+                                dataSaida: (() => {
+                                    const v = c.DataSaida || c.DataSaid || c.dataSaida || '';
+                                    if (!v) return '';
+                                    // Converter serial Excel para data
+                                    if (typeof v === 'number' || (!isNaN(v) && !String(v).includes('-'))) {
+                                        const num = typeof v === 'number' ? v : parseFloat(v);
+                                        const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+                                        return d.toISOString().split('T')[0];
+                                    }
+                                    // Já em formato ISO
+                                    if (String(v).match(/^\d{4}-\d{2}-\d{2}/)) return String(v).substring(0, 10);
+                                    return String(v);
+                                })(),
                                 pin: c.PIN || c.pin || ''
                             })).filter(c => c.nome);
                             console.log('Colaboradores carregados:', colabs.length);
@@ -621,6 +656,18 @@
                             console.log('Férias aprovadas carregadas:', feriasProcessadas.length);
                             setFerias(feriasProcessadas);
                             localStorage.setItem('adminFerias', JSON.stringify(feriasProcessadas));
+                        }
+
+                        // Tipos de Perturbação
+                        if (dataConfig.configperturbacoes && dataConfig.configperturbacoes.length > 0) {
+                            const tipos = dataConfig.configperturbacoes
+                                .map(p => p.Perturbacao || p.perturbacao || p.Tipo || p.tipo || p.Nome || p.nome || '')
+                                .filter(Boolean);
+                            if (tipos.length > 0) {
+                                console.log('Tipos perturbação carregados:', tipos.length);
+                                setTiposPerturbacao(tipos);
+                                localStorage.setItem('adminTiposPerturbacao', JSON.stringify(tipos));
+                            }
                         }
 
                     } catch (errConfig) {
@@ -791,7 +838,66 @@
                 }
             };
 
-            // Função para guardar mapa de horas automaticamente
+            const adicionarPerturbacao = async () => {
+                if (!formPert.tipo || !formPert.horaInicio || !formPert.horaFim) {
+                    alert('Preenche tipo, hora início e hora fim.'); return;
+                }
+                const id = String(Date.now());
+                const mins = calcMin(formPert.horaInicio, formPert.horaFim);
+                const duracao = `${Math.floor(mins/60)}h ${mins%60}min`;
+                const novaPert = {
+                    id, data: modalDados.data, colaborador: modalDados.colab,
+                    tipo: formPert.tipo, horaInicio: formPert.horaInicio,
+                    horaFim: formPert.horaFim, duracao
+                };
+                try {
+                    await fetch(CONFIG.URL_ESCREVER_CONFIG, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ acao: 'adicionar', tabela: 'perturbacoes', dados: {
+                            'ID Registo': id, 'Data': modalDados.data, 'Colaborador': modalDados.colab,
+                            'Tipo Perturbação': formPert.tipo, 'Hora Início': formPert.horaInicio,
+                            'Hora Fim': formPert.horaFim, 'Duração': duracao
+                        }})
+                    });
+                } catch(e) { console.log('Erro ao adicionar perturbação:', e); }
+                const novas = [...perturbacoes, novaPert];
+                setPerturbacoes(novas);
+                localStorage.setItem('adminPerturbacoes', JSON.stringify(novas));
+                const nomeLower = modalDados.colab.toLowerCase();
+                setModalDados({ ...modalDados, perturbacoes: novas.filter(p => p.colaborador.toLowerCase() === nomeLower && p.data === modalDados.data) });
+                setFormPert({ tipo: '', horaInicio: '', horaFim: '' });
+                setAdicionandoPert(false);
+                alert('✅ Perturbação adicionada!');
+            };
+
+            const guardarEdicaoPerturbacao = async () => {
+                if (!formPert.tipo || !formPert.horaInicio || !formPert.horaFim) {
+                    alert('Preenche todos os campos.'); return;
+                }
+                const mins = calcMin(formPert.horaInicio, formPert.horaFim);
+                const duracao = `${Math.floor(mins/60)}h ${mins%60}min`;
+                const novas = perturbacoes.map(p => String(p.id) === String(editandoPert)
+                    ? { ...p, tipo: formPert.tipo, horaInicio: formPert.horaInicio, horaFim: formPert.horaFim, duracao }
+                    : p
+                );
+                try {
+                    await fetch(CONFIG.URL_ALTERAR, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: String(editandoPert), tabela: 'Perturbações',
+                            'Tipo Perturbação': formPert.tipo, 'Hora Início': formPert.horaInicio,
+                            'Hora Fim': formPert.horaFim, 'Duração': duracao })
+                    });
+                } catch(e) { console.log('Erro ao editar perturbação:', e); }
+                setPerturbacoes(novas);
+                localStorage.setItem('adminPerturbacoes', JSON.stringify(novas));
+                const nomeLower = modalDados.colab.toLowerCase();
+                setModalDados({ ...modalDados, perturbacoes: novas.filter(p => p.colaborador.toLowerCase() === nomeLower && p.data === modalDados.data) });
+                setEditandoPert(null);
+                setFormPert({ tipo: '', horaInicio: '', horaFim: '' });
+                alert('✅ Perturbação atualizada!');
+            };
             const guardarMapaAuto = async (mes, registosData, forcar = false) => {
                 // Se não forçar, verificar se já foi guardado
                 if (!forcar) {
@@ -819,7 +925,7 @@
                     return m / 60;
                 };
                 
-                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
+                const dados = colaboradores.map(c => {
                     const row = { Colaborador: c.nome, Mes: mes };
                     let total = 0;
                     for (let d = 1; d <= 31; d++) {
@@ -1081,6 +1187,8 @@
             };
 
             const getStatusDia = (colab, data) => {
+                // Após data de saída
+                if (colab.dataSaida && data > colab.dataSaida) return 'saida';
                 const ds = getDiaSemana(data);
                 if (eFeriado(data) || feriados.find(f => f.data === data)) return 'feriado';
                 const ausenciaMatch = ausencias.find(a => a.nome === colab.nome && data >= a.dataInicio && data <= a.dataFim);
@@ -1155,7 +1263,7 @@
                         <button className={tab === 'horas' ? 'active' : ''} onClick={() => setTab('horas')}>🕐 Horas</button>
                         <button className={tab === 'matriz' ? 'active' : ''} onClick={() => setTab('matriz')}>📦 Matriz</button>
                         <button className={tab === 'equipa' ? 'active' : ''} onClick={() => setTab('equipa')}>👥 Equipa</button>
-                        <button className={tab === 'ausencias' ? 'active' : ''} onClick={() => setTab('ausencias')}>🏖️ Ausências</button>
+                        <button className={tab === 'ausencias' ? 'active' : ''} onClick={() => setTab('ausencias')}>🏖️ Férias & Ausências</button>
                         <button className={tab === 'pins' ? 'active' : ''} onClick={() => setTab('pins')}>🔑 PINs</button>
                         <button className={tab === 'cruzamento' ? 'active' : ''} onClick={() => { setTab('cruzamento'); if (encomendas.length === 0) carregarEncomendas(); }}>🔄 Produção vs Enc.</button>
                     </div>
@@ -1257,6 +1365,7 @@
                                         <span>🏖️ Férias</span>
                                         <span>🟣 Feriado</span>
                                         <span>⚫ FDS/Folga</span>
+                                        <span>░ Fora da empresa</span>
                                     </div>
                                 </div>
 
@@ -1274,7 +1383,7 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {colaboradores.filter(c => c.ativo).map((colab, i) => (
+                                            {colaboradores.filter(c => c.ativo || diasPeriodo.some(d => registos.some(r => r.colaborador.toLowerCase() === c.nome.toLowerCase() && r.data === d))).map((colab, i) => (
                                                 <tr key={i}>
                                                     <td className="nome-col" style={{ fontSize: '11px' }}>
                                                         {colab.nome.split(' ')[0]} {colab.nome.split(' ').slice(-1)[0]}
@@ -1284,7 +1393,8 @@
                                                         const horas = calcHorasReg(colab.nome, d);
                                                         let cls = 'cel-cinza';
                                                         const ds = getDiaSemana(d);
-                                                        if (status === 'completo') cls = 'cel-verde';
+                                                        if (status === 'saida') cls = 'cel-saida';
+                                                        else if (status === 'completo') cls = 'cel-verde';
                                                         else if (status === 'parcial') cls = 'cel-amarelo';
                                                         else if (status === 'semregisto') cls = 'cel-vermelho';
                                                         else if (status === 'ausencia') cls = 'cel-azul';
@@ -1295,10 +1405,10 @@
                                                         
                                                         return (
                                                             <td key={d} className={cls} 
-                                                                style={{ cursor: 'pointer' }}
-                                                                onClick={() => abrirDetalhe(colab, d)}
-                                                                title={status === 'ferias' ? '🏖️ Férias' : status === 'ausencia' ? '🔵 Ausência' : `${horas.toFixed(1)}h`}>
-                                                                {status === 'ferias' ? '🏖' : horas > 0 ? horas.toFixed(0) : ''}
+                                                                style={{ cursor: status === 'saida' ? 'default' : 'pointer' }}
+                                                                onClick={() => status !== 'saida' && abrirDetalhe(colab, d)}
+                                                                title={status === 'saida' ? '🚫 Fora da empresa' : status === 'ferias' ? '🏖️ Férias' : status === 'ausencia' ? '🔵 Ausência' : `${horas.toFixed(1)}h`}>
+                                                                {status === 'saida' ? '' : status === 'ferias' ? '🏖' : horas > 0 ? horas.toFixed(0) : ''}
                                                             </td>
                                                         );
                                                     })}
@@ -1325,7 +1435,7 @@
                                                 const [ano, mes] = mesAtual.split('-');
                                                 const ultimoDia = new Date(ano, mes, 0).getDate();
                                                 
-                                                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
+                                                const dados = colaboradores.map(c => {
                                                     const row = { Colaborador: c.nome };
                                                     let total = 0;
                                                     for (let d = 1; d <= ultimoDia; d++) {
@@ -1347,7 +1457,7 @@
                                                 const [ano, mes] = mesAtual.split('-');
                                                 const ultimoDia = new Date(ano, mes, 0).getDate();
                                                 
-                                                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
+                                                const dados = colaboradores.map(c => {
                                                     const row = { Colaborador: c.nome, Mes: mesAtual };
                                                     let total = 0;
                                                     for (let d = 1; d <= 31; d++) {
@@ -1402,7 +1512,12 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {colaboradores.filter(c => c.ativo).map((colab, i) => {
+                                            {colaboradores.filter(c => {
+                                                if (c.ativo) return true;
+                                                // Incluir inativos que tenham registos no mês selecionado
+                                                const [ano, mes] = mesAtual.split('-');
+                                                return registos.some(r => r.colaborador.toLowerCase() === c.nome.toLowerCase() && r.data.startsWith(`${ano}-${mes}`));
+                                            }).map((colab, i) => {
                                                 const [ano, mes] = mesAtual.split('-');
                                                 const ultimoDia = new Date(ano, mes, 0).getDate();
                                                 let totalMes = 0;
@@ -1421,17 +1536,22 @@
                                                                 const ds = getDiaSemana(data);
                                                                 const fds = ds === 'sab' || ds === 'dom';
                                                                 const fer = eFeriado(data);
+                                                                const aposSaida = colab.dataSaida && data > colab.dataSaida;
                                                                 
                                                                 let bg = '#1e293b';
-                                                                if (fer) bg = '#5b21b6';
+                                                                let style = { background: bg, fontSize: '11px' };
+                                                                if (aposSaida) {
+                                                                    style = { fontSize: '11px', background: '#0f172a', backgroundImage: 'repeating-linear-gradient(45deg, #0a0a14 0px, #0a0a14 2px, #0f172a 2px, #0f172a 8px)', opacity: 0.5 };
+                                                                } else if (fer) bg = '#5b21b6';
                                                                 else if (fds && h > 0) bg = '#92400e';
                                                                 else if (fds) bg = '#334155';
                                                                 else if (h >= 8) bg = '#065f46';
                                                                 else if (h > 0) bg = '#92400e';
+                                                                if (!aposSaida) style = { background: bg, fontSize: '11px' };
                                                                 
                                                                 celulas.push(
-                                                                    <td key={d} style={{ background: bg, fontSize: '11px' }}>
-                                                                        {h > 0 ? h.toFixed(0) : ''}
+                                                                    <td key={d} style={style}>
+                                                                        {!aposSaida && h > 0 ? h.toFixed(0) : ''}
                                                                     </td>
                                                                 );
                                                             }
@@ -1456,7 +1576,7 @@
                                                     for (let d = 1; d <= ultimoDia; d++) {
                                                         const data = `${ano}-${mes}-${String(d).padStart(2, '0')}`;
                                                         let totalDia = 0;
-                                                        colaboradores.filter(c => c.ativo).forEach(c => {
+                                                        colaboradores.filter(c => c.ativo || registos.some(r => r.colaborador.toLowerCase() === c.nome.toLowerCase() && r.data.startsWith(`${ano}-${mes}`))).forEach(c => {
                                                             totalDia += calcHorasReg(c.nome, data);
                                                         });
                                                         grandeTotal += totalDia;
@@ -1765,64 +1885,278 @@
                         )}
 
                         {/* ==================== AUSÊNCIAS ==================== */}
-                        {tab === 'ausencias' && (
+                        {tab === 'ausencias' && (() => {
+                            const hoje = new Date();
+                            const anoAtual = hoje.getFullYear();
+                            return (
                             <div>
-                                <div className="card">
-                                    <h3 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>➕ Nova Ausência</h3>
-                                    <select className="input mb-2" id="ausNome">
-                                        <option value="">Colaborador...</option>
-                                        {colaboradores.filter(c => c.ativo).map((c, i) => <option key={i} value={c.nome}>{c.nome}</option>)}
-                                    </select>
-                                    <select className="input mb-2" id="ausTipo">
-                                        <option value="">Tipo...</option>
-                                        <option value="Férias">🏖️ Férias</option>
-                                        <option value="Baixa">🏥 Baixa</option>
-                                        <option value="Falta">❌ Falta</option>
-                                    </select>
-                                    <div className="grid-2 mb-2">
-                                        <input type="date" className="input" id="ausIni" />
-                                        <input type="date" className="input" id="ausFim" />
+                                {/* ---- MAPA DE FÉRIAS ---- */}
+                                <div className="card" style={{ marginBottom: '15px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                        <h3 style={{ margin: 0, fontSize: '15px' }}>📆 Mapa de Férias Aprovadas</h3>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => {
+                                                if (mesFeriasIdx === 0) { setMesFeriasIdx(11); setAnoFerias(anoFerias - 1); }
+                                                else setMesFeriasIdx(mesFeriasIdx - 1);
+                                            }}>◀</button>
+                                            <span style={{ fontWeight: '700', fontSize: '14px', textTransform: 'capitalize', minWidth: 140, textAlign: 'center' }}>
+                                                {new Date(anoFerias, mesFeriasIdx, 1).toLocaleString('pt-PT', { month: 'long', year: 'numeric' })}
+                                            </span>
+                                            <button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => {
+                                                if (mesFeriasIdx === 11) { setMesFeriasIdx(0); setAnoFerias(anoFerias + 1); }
+                                                else setMesFeriasIdx(mesFeriasIdx + 1);
+                                            }}>▶</button>
+                                        </div>
                                     </div>
-                                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={async () => {
-                                        const nome = document.getElementById('ausNome').value;
-                                        const tipo = document.getElementById('ausTipo').value;
-                                        const ini = document.getElementById('ausIni').value;
-                                        const fim = document.getElementById('ausFim').value;
-                                        if (!nome || !tipo || !ini || !fim) { alert('Preencha tudo!'); return; }
-                                        const ausId = String(Date.now());
-                                        setAusencias([...ausencias, { id: ausId, nome, tipo, dataInicio: ini, dataFim: fim }]);
-                                        document.getElementById('ausNome').value = '';
-                                        document.getElementById('ausTipo').value = '';
-                                        // Sincronizar com Excel
-                                        console.log('🔄 A sincronizar ausência:', { ausId, nome, tipo, ini, fim });
-                                        const ok = await escreverConfig('adicionar', 'Ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
-                                        if (ok) alert('✅ Ausência registada e sincronizada!');
-                                        else alert('✅ Ausência registada localmente (erro na sincronização com Excel).');
-                                    }}>Registar</button>
+                                    <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', fontSize: '11px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 12, height: 12, background: '#1d4ed8', borderRadius: 2, display: 'inline-block' }}></span> Planeado</span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 12, height: 12, background: '#15803d', borderRadius: 2, display: 'inline-block' }}></span> Confirmado</span>
+                                    </div>
+                                    {(() => {
+                                        const mesStr = `${anoFerias}-${String(mesFeriasIdx + 1).padStart(2, '0')}`;
+                                        const ultimoDia = new Date(anoFerias, mesFeriasIdx + 1, 0).getDate();
+                                        const diasSemana = ['D','S','T','Q','Q','S','S'];
+                                        const colabsComFerias = colaboradores.filter(c => ferias.some(f => f.nome === c.nome && f.dataInicio.startsWith(mesStr)));
+                                        const estaConfirmado = (nome, data) => ausencias.some(a => a.nome === nome && a.tipo === 'Férias' && a.dataInicio <= data && a.dataFim >= data);
+                                        const eFeriasPlan = (nome, data) => ferias.some(f => f.nome === nome && f.dataInicio === data);
+                                        const confirmarDia = async (nome, data) => {
+                                            if (estaConfirmado(nome, data)) {
+                                                const novos = ausencias.filter(a => !(a.nome === nome && a.tipo === 'Férias' && a.dataInicio === data && a.dataFim === data));
+                                                setAusencias(novos);
+                                                localStorage.setItem('adminAusencias', JSON.stringify(novos));
+                                            } else {
+                                                const id = String(Date.now());
+                                                const nova = { id, nome, tipo: 'Férias', dataInicio: data, dataFim: data };
+                                                const novos = [...ausencias, nova];
+                                                setAusencias(novos);
+                                                localStorage.setItem('adminAusencias', JSON.stringify(novos));
+                                                await escreverConfig('adicionar', 'Ausencias', { ID: id, Nome: nome, Tipo: 'Férias', DataInicio: data, DataFim: data });
+                                            }
+                                        };
+                                        const confirmarTodos = async (nome) => {
+                                            const diasPlan = ferias.filter(f => f.nome === nome && f.dataInicio.startsWith(mesStr));
+                                            for (const f of diasPlan) {
+                                                if (!estaConfirmado(nome, f.dataInicio)) await confirmarDia(nome, f.dataInicio);
+                                            }
+                                        };
+                                        if (colabsComFerias.length === 0) return <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', padding: '10px' }}>Nenhuma férias planeada para este mês</div>;
+                                        return (
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ borderCollapse: 'collapse', fontSize: '11px', minWidth: '100%' }}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ padding: '6px 10px', textAlign: 'left', background: '#1e293b', position: 'sticky', left: 0, zIndex: 2, minWidth: 130, borderRight: '1px solid #334155' }}>Colaborador</th>
+                                                            {Array.from({ length: ultimoDia }, (_, i) => {
+                                                                const d = i + 1;
+                                                                const data = `${mesStr}-${String(d).padStart(2, '0')}`;
+                                                                const diaSem = new Date(data).getDay();
+                                                                const fds = diaSem === 0 || diaSem === 6;
+                                                                return <th key={d} style={{ padding: '4px 2px', textAlign: 'center', background: fds ? '#0f172a' : '#1e293b', minWidth: 26, borderRight: '1px solid #1e293b' }}>
+                                                                    <div style={{ color: fds ? '#475569' : '#94a3b8' }}>{diasSemana[diaSem]}</div>
+                                                                    <div style={{ fontWeight: '600', color: fds ? '#475569' : '#e2e8f0' }}>{d}</div>
+                                                                </th>;
+                                                            })}
+                                                            <th style={{ padding: '6px 8px', background: '#1e293b', textAlign: 'center', minWidth: 60 }}>Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {colabsComFerias.map((c, ci) => {
+                                                            const totalPlan = ferias.filter(f => f.nome === c.nome && f.dataInicio.startsWith(mesStr)).length;
+                                                            const totalConf = ferias.filter(f => f.nome === c.nome && f.dataInicio.startsWith(mesStr) && estaConfirmado(c.nome, f.dataInicio)).length;
+                                                            return <tr key={ci} style={{ borderBottom: '1px solid #1e293b' }}>
+                                                                <td style={{ padding: '6px 10px', background: '#0f172a', position: 'sticky', left: 0, zIndex: 1, borderRight: '1px solid #334155', whiteSpace: 'nowrap' }}>
+                                                                    <div style={{ fontWeight: '600', fontSize: '12px' }}>{c.nome}</div>
+                                                                    <div style={{ color: '#64748b', fontSize: '10px' }}>{totalConf}/{totalPlan} conf.</div>
+                                                                </td>
+                                                                {Array.from({ length: ultimoDia }, (_, i) => {
+                                                                    const d = i + 1;
+                                                                    const data = `${mesStr}-${String(d).padStart(2, '0')}`;
+                                                                    const diaSem = new Date(data).getDay();
+                                                                    const fds = diaSem === 0 || diaSem === 6;
+                                                                    const plan = eFeriasPlan(c.nome, data);
+                                                                    const conf = plan && estaConfirmado(c.nome, data);
+                                                                    return <td key={d} onClick={() => plan && confirmarDia(c.nome, data)}
+                                                                        style={{ padding: '4px 2px', textAlign: 'center', background: conf ? '#14532d' : plan ? '#1e3a8a' : fds ? '#0a0a14' : '#0f172a', cursor: plan ? 'pointer' : 'default', borderRight: '1px solid #1e293b' }}
+                                                                        title={plan ? (conf ? 'Confirmado — clica para desfazer' : 'Planeado — clica para confirmar') : ''}>
+                                                                        {conf ? '✓' : plan ? '·' : ''}
+                                                                    </td>;
+                                                                })}
+                                                                <td style={{ padding: '4px 6px', background: '#0f172a', textAlign: 'center' }}>
+                                                                    {totalConf < totalPlan && <button className="btn btn-success" style={{ padding: '3px 8px', fontSize: '10px' }} onClick={() => confirmarTodos(c.nome)}>✓ Todos</button>}
+                                                                </td>
+                                                            </tr>;
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
-                                {ausencias.length > 0 && (
-                                    <div className="card">
-                                        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>📋 Ausências ({ausencias.length})</h3>
-                                        {ausencias.map((a, i) => (
-                                            <div key={a.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: '#0f172a', borderRadius: '6px', marginBottom: '6px', fontSize: '12px' }}>
-                                                <div>
-                                                    <div style={{ fontWeight: '600' }}>{a.nome}</div>
-                                                    <div style={{ color: '#64748b' }}>{a.tipo} • {formatData(a.dataInicio)} → {formatData(a.dataFim)}</div>
-                                                </div>
-                                                <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={async () => {
-                                                    if (!confirm('Eliminar ausência de ' + a.nome + '?')) return;
-                                                    setAusencias(ausencias.filter(x => x.id !== a.id));
-                                                    const ok = await escreverConfig('eliminar', 'Ausencias', { ID: String(a.id), Nome: a.nome, Tipo: a.tipo, DataInicio: a.dataInicio, DataFim: a.dataFim });
-                                                    if (ok) alert('✅ Ausência eliminada e sincronizada!');
-                                                    else alert('⚠️ Removida localmente mas erro na sincronização.');
-                                                }}>🗑️</button>
+                                {/* ---- MAPA DE AUSÊNCIAS ---- */}
+                                <div className="card">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                        <h3 style={{ margin: 0, fontSize: '15px' }}>🗓️ Mapa de Ausências</h3>
+                                        <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '11px' }}
+                                            onClick={() => setAdicionandoAus(!adicionandoAus)}>
+                                            {adicionandoAus ? '✕ Cancelar' : '➕ Nova'}
+                                        </button>
+                                    </div>
+
+                                    {/* Formulário nova ausência */}
+                                    {adicionandoAus && (
+                                        <div style={{ background: '#0f172a', border: '1px solid #3b82f6', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+                                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#93c5fd', marginBottom: '8px' }}>Nova Ausência</div>
+                                            <select className="input mb-2" id="ausNome">
+                                                <option value="">Colaborador...</option>
+                                                {colaboradores.filter(c => c.ativo).map((c, i) => <option key={i} value={c.nome}>{c.nome}</option>)}
+                                            </select>
+                                            <select className="input mb-2" id="ausTipo">
+                                                <option value="">Tipo...</option>
+                                                <option value="Férias">🏖️ Férias</option>
+                                                <option value="Baixa">🏥 Baixa</option>
+                                                <option value="Falta">❌ Falta</option>
+                                            </select>
+                                            <div className="grid-2 mb-2">
+                                                <input type="date" className="input" id="ausIni" />
+                                                <input type="date" className="input" id="ausFim" />
                                             </div>
-                                        ))}
+                                            <button className="btn btn-primary" style={{ width: '100%' }} onClick={async () => {
+                                                const nome = document.getElementById('ausNome').value;
+                                                const tipo = document.getElementById('ausTipo').value;
+                                                const ini = document.getElementById('ausIni').value;
+                                                const fim = document.getElementById('ausFim').value;
+                                                if (!nome || !tipo || !ini || !fim) { alert('Preencha tudo!'); return; }
+                                                const ausId = String(Date.now());
+                                                const nova = { id: ausId, nome, tipo, dataInicio: ini, dataFim: fim };
+                                                setAusencias([...ausencias, nova]);
+                                                document.getElementById('ausNome').value = '';
+                                                document.getElementById('ausTipo').value = '';
+                                                document.getElementById('ausIni').value = '';
+                                                document.getElementById('ausFim').value = '';
+                                                setAdicionandoAus(false);
+                                                const ok = await escreverConfig('adicionar', 'Ausencias', { ID: ausId, Nome: nome, Tipo: tipo, DataInicio: ini, DataFim: fim });
+                                                if (ok) alert('✅ Ausência registada e sincronizada!');
+                                                else alert('✅ Ausência registada localmente.');
+                                            }}>💾 Guardar</button>
+                                        </div>
+                                    )}
+
+                                    {/* Legenda */}
+                                    <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', fontSize: '11px', flexWrap: 'wrap' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 12, height: 12, background: '#0e7490', borderRadius: 2, display: 'inline-block' }}></span> Férias</span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 12, height: 12, background: '#7c3aed', borderRadius: 2, display: 'inline-block' }}></span> Baixa</span>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 12, height: 12, background: '#b91c1c', borderRadius: 2, display: 'inline-block' }}></span> Falta</span>
+                                    </div>
+
+                                    {/* Mapa grelha */}
+                                    {(() => {
+                                        const mesStr = `${anoFerias}-${String(mesFeriasIdx + 1).padStart(2, '0')}`;
+                                        const ultimoDia = new Date(anoFerias, mesFeriasIdx + 1, 0).getDate();
+                                        const diasSemana = ['D','S','T','Q','Q','S','S'];
+                                        const CORES_AUS = { 'férias': '#0e7490', 'baixa': '#7c3aed', 'falta': '#b91c1c' };
+
+                                        const ausenciasDomes = ausencias.filter(a => {
+                                            // Verificar se a ausência tem dias neste mês
+                                            const primDia = `${mesStr}-01`;
+                                            const ultDia = `${mesStr}-${String(ultimoDia).padStart(2, '0')}`;
+                                            return a.dataInicio <= ultDia && a.dataFim >= primDia;
+                                        });
+
+                                        const colabsComAus = colaboradores.filter(c =>
+                                            ausenciasDomes.some(a => a.nome === c.nome)
+                                        );
+
+                                        const getAusDia = (nome, data) =>
+                                            ausenciasDomes.find(a => a.nome === nome && a.dataInicio <= data && a.dataFim >= data);
+
+                                        if (colabsComAus.length === 0) return (
+                                            <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', padding: '10px' }}>
+                                                Nenhuma ausência registada para este mês
+                                            </div>
+                                        );
+
+                                        return (
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ borderCollapse: 'collapse', fontSize: '11px', minWidth: '100%' }}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ padding: '6px 10px', textAlign: 'left', background: '#1e293b', position: 'sticky', left: 0, zIndex: 2, minWidth: 130, borderRight: '1px solid #334155' }}>Colaborador</th>
+                                                            {Array.from({ length: ultimoDia }, (_, i) => {
+                                                                const d = i + 1;
+                                                                const data = `${mesStr}-${String(d).padStart(2, '0')}`;
+                                                                const diaSem = new Date(data).getDay();
+                                                                const fds = diaSem === 0 || diaSem === 6;
+                                                                return <th key={d} style={{ padding: '4px 2px', textAlign: 'center', background: fds ? '#0f172a' : '#1e293b', minWidth: 26, borderRight: '1px solid #1e293b' }}>
+                                                                    <div style={{ color: fds ? '#475569' : '#94a3b8' }}>{diasSemana[diaSem]}</div>
+                                                                    <div style={{ fontWeight: '600', color: fds ? '#475569' : '#e2e8f0' }}>{d}</div>
+                                                                </th>;
+                                                            })}
+                                                            <th style={{ padding: '6px 8px', background: '#1e293b', minWidth: 10 }}></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {colabsComAus.map((c, ci) => {
+                                                            const ausColab = ausenciasDomes.filter(a => a.nome === c.nome);
+                                                            return <tr key={ci} style={{ borderBottom: '1px solid #1e293b' }}>
+                                                                <td style={{ padding: '6px 10px', background: '#0f172a', position: 'sticky', left: 0, zIndex: 1, borderRight: '1px solid #334155', whiteSpace: 'nowrap' }}>
+                                                                    <div style={{ fontWeight: '600', fontSize: '12px' }}>{c.nome}</div>
+                                                                    <div style={{ color: '#64748b', fontSize: '10px' }}>
+                                                                        {[...new Set(ausColab.map(a => a.tipo))].join(', ')}
+                                                                    </div>
+                                                                </td>
+                                                                {Array.from({ length: ultimoDia }, (_, i) => {
+                                                                    const d = i + 1;
+                                                                    const data = `${mesStr}-${String(d).padStart(2, '0')}`;
+                                                                    const diaSem = new Date(data).getDay();
+                                                                    const fds = diaSem === 0 || diaSem === 6;
+                                                                    const aus = getAusDia(c.nome, data);
+                                                                    const cor = aus ? (CORES_AUS[aus.tipo.toLowerCase()] || '#475569') : null;
+                                                                    return <td key={d}
+                                                                        onClick={() => aus && setAusPopup({ nome: c.nome, data, aus })}
+                                                                        style={{ padding: '4px 2px', textAlign: 'center', background: cor || (fds ? '#0a0a14' : '#0f172a'), borderRight: '1px solid #1e293b', cursor: aus ? 'pointer' : 'default' }}
+                                                                        title={aus ? `${aus.tipo} — clica para detalhes` : ''}>
+                                                                        {aus ? <span style={{ fontSize: '9px', color: 'white', fontWeight: '600' }}>{aus.tipo.charAt(0).toUpperCase()}</span> : ''}
+                                                                    </td>;
+                                                                })}
+                                                            </tr>;
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* Popup detalhe ausência */}
+                                {ausPopup && (
+                                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        onClick={() => setAusPopup(null)}>
+                                        <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', minWidth: '280px', maxWidth: '360px' }}
+                                            onClick={e => e.stopPropagation()}>
+                                            <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{ausPopup.nome}</div>
+                                            <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '16px' }}>{formatData(ausPopup.data)}</div>
+                                            <div style={{ background: '#0f172a', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '4px' }}>{ausPopup.aus.tipo}</div>
+                                                <div style={{ color: '#64748b', fontSize: '11px' }}>
+                                                    {formatData(ausPopup.aus.dataInicio)} → {formatData(ausPopup.aus.dataFim)}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setAusPopup(null)}>Fechar</button>
+                                                <button className="btn btn-danger" style={{ flex: 1 }} onClick={async () => {
+                                                    if (!confirm(`Eliminar ${ausPopup.aus.tipo} de ${ausPopup.nome}?`)) return;
+                                                    setAusencias(ausencias.filter(x => x.id !== ausPopup.aus.id));
+                                                    setAusPopup(null);
+                                                    await escreverConfig('eliminar', 'Ausencias', { ID: String(ausPopup.aus.id), Nome: ausPopup.aus.nome, Tipo: ausPopup.aus.tipo, DataInicio: ausPopup.aus.dataInicio, DataFim: ausPopup.aus.dataFim });
+                                                }}>🗑️ Eliminar</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {/* ==================== CRUZAMENTO PRODUÇÃO vs ENCOMENDAS ==================== */}
                         {tab === 'cruzamento' && (() => {
@@ -2240,13 +2574,54 @@
                                     )}
                                     
                                     {/* Perturbações */}
-                                    {modalDados.perturbacoes && modalDados.perturbacoes.length > 0 && (
-                                        <div style={{ marginTop: '15px', borderTop: '1px solid #334155', paddingTop: '15px' }}>
-                                            <div style={{ marginBottom: '10px', color: '#ef4444', fontSize: '13px', fontWeight: '600' }}>
-                                                ⚠️ Perturbações ({modalDados.perturbacoes.length})
+                                    <div style={{ marginTop: '15px', borderTop: '1px solid #334155', paddingTop: '15px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                            <div style={{ color: '#ef4444', fontSize: '13px', fontWeight: '600' }}>
+                                                ⚠️ Perturbações ({(modalDados.perturbacoes || []).length})
                                             </div>
-                                            {modalDados.perturbacoes.map((p, i) => (
-                                                <div key={p.id || i} style={{ background: '#450a0a', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
+                                            <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: '11px' }}
+                                                onClick={() => { setAdicionandoPert(!adicionandoPert); setEditandoPert(null); setFormPert({ tipo: '', horaInicio: '', horaFim: '' }); }}>
+                                                {adicionandoPert ? '✕ Cancelar' : '➕ Nova'}
+                                            </button>
+                                        </div>
+
+                                        {/* Formulário adicionar */}
+                                        {adicionandoPert && (
+                                            <div style={{ background: '#1e1e2e', border: '1px solid #ef4444', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
+                                                <div style={{ fontSize: '12px', fontWeight: '600', color: '#fca5a5', marginBottom: '8px' }}>Nova Perturbação</div>
+                                                <select className="input mb-2" value={formPert.tipo} onChange={e => setFormPert({...formPert, tipo: e.target.value})} style={{ padding: '6px', fontSize: '12px' }}>
+                                                    <option value="">Tipo...</option>
+                                                    {tiposPerturbacao.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                                                </select>
+                                                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                                    <input type="time" className="input" value={formPert.horaInicio} onChange={e => setFormPert({...formPert, horaInicio: e.target.value})} style={{ flex: 1, padding: '6px', fontSize: '12px' }} />
+                                                    <input type="time" className="input" value={formPert.horaFim} onChange={e => setFormPert({...formPert, horaFim: e.target.value})} style={{ flex: 1, padding: '6px', fontSize: '12px' }} />
+                                                </div>
+                                                <button className="btn btn-danger" style={{ width: '100%', padding: '6px', fontSize: '12px' }} onClick={adicionarPerturbacao}>
+                                                    💾 Guardar Perturbação
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Lista de perturbações */}
+                                        {(modalDados.perturbacoes || []).map((p, i) => (
+                                            <div key={p.id || i} style={{ background: '#450a0a', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
+                                                {editandoPert === String(p.id) ? (
+                                                    <div>
+                                                        <select className="input mb-2" value={formPert.tipo} onChange={e => setFormPert({...formPert, tipo: e.target.value})} style={{ padding: '6px', fontSize: '12px' }}>
+                                                            <option value="">Tipo...</option>
+                                                            {tiposPerturbacao.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                                                        </select>
+                                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                                            <input type="time" className="input" value={formPert.horaInicio} onChange={e => setFormPert({...formPert, horaInicio: e.target.value})} style={{ flex: 1, padding: '6px', fontSize: '12px' }} />
+                                                            <input type="time" className="input" value={formPert.horaFim} onChange={e => setFormPert({...formPert, horaFim: e.target.value})} style={{ flex: 1, padding: '6px', fontSize: '12px' }} />
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                            <button className="btn btn-success" style={{ flex: 1, padding: '4px', fontSize: '11px' }} onClick={guardarEdicaoPerturbacao}>💾 Guardar</button>
+                                                            <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => { setEditandoPert(null); setFormPert({ tipo: '', horaInicio: '', horaFim: '' }); }}>✕</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: '600', fontSize: '13px', color: '#fca5a5' }}>{p.tipo}</div>
@@ -2254,12 +2629,19 @@
                                                                 {p.horaInicio} - {p.horaFim} ({p.duracao || calcMin(p.horaInicio, p.horaFim) + 'min'})
                                                             </div>
                                                         </div>
-                                                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => eliminarPerturbacao(p.id)}>🗑️</button>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                            <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => {
+                                                                setEditandoPert(String(p.id));
+                                                                setAdicionandoPert(false);
+                                                                setFormPert({ tipo: p.tipo, horaInicio: p.horaInicio, horaFim: p.horaFim });
+                                                            }}>✏️</button>
+                                                            <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => eliminarPerturbacao(p.id)}>🗑️</button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
