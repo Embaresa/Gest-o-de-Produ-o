@@ -507,7 +507,7 @@
                                 nome: c.Nome || c.nome || '',
                                 turno: (c.Turno || c.turno || 'normal').toLowerCase(),
                                 dias: (c.DiasTrabalho || c.diasTrabalho || 'seg,ter,qua,qui,sex').toLowerCase().split(','),
-                                ativo: (c.Ativo || c.ativo || 'Sim') === 'Sim',
+                                ativo: (() => { const v = String(c.Ativo || c.ativo || 'true').toLowerCase(); return v === 'true' || v === 'sim' || v === 'verdadeiro'; })(),
                                 dataSaida: c.DataSaida || c.dataSaida || '',
                                 pin: c.PIN || c.pin || ''
                             })).filter(c => c.nome);
@@ -819,7 +819,7 @@
                     return m / 60;
                 };
                 
-                const dados = colaboradores.filter(c => c.ativo).map(c => {
+                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
                     const row = { Colaborador: c.nome, Mes: mes };
                     let total = 0;
                     for (let d = 1; d <= 31; d++) {
@@ -1325,7 +1325,7 @@
                                                 const [ano, mes] = mesAtual.split('-');
                                                 const ultimoDia = new Date(ano, mes, 0).getDate();
                                                 
-                                                const dados = colaboradores.filter(c => c.ativo).map(c => {
+                                                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
                                                     const row = { Colaborador: c.nome };
                                                     let total = 0;
                                                     for (let d = 1; d <= ultimoDia; d++) {
@@ -1347,7 +1347,7 @@
                                                 const [ano, mes] = mesAtual.split('-');
                                                 const ultimoDia = new Date(ano, mes, 0).getDate();
                                                 
-                                                const dados = colaboradores.filter(c => c.ativo).map(c => {
+                                                const dados = colaboradores.filter(c => c.ativo || c.dataSaida).map(c => {
                                                     const row = { Colaborador: c.nome, Mes: mesAtual };
                                                     let total = 0;
                                                     for (let d = 1; d <= 31; d++) {
