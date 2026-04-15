@@ -69,6 +69,7 @@
             URL_LER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/5da3828d37564c2ba8af16ca06e2b7e0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=NRb520YI7wcDJjMufAfUzrlYIQSQ3ub6dl1KrQ3_FxI',
             URL_ESCREVER_CONFIG: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7ac8ac76458141b3bdbf0a981e9bf727/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=r5BztBsGszRYRdEyojb8qC5aTfPcYrxZLaMi8-eFmPE',
             URL_ADICIONAR_PROD: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8c8cb9f38df4489eaa2ebd6afcdab255/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jMin9p5_ZxITDMuRcm2PeH8LlrC6SxeM_hNTLRfn-CI',
+            URL_ADICIONAR_PERT: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/971c47b2c0f34fcb87a4d2915ec0b866/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jenqnDFyXmVuQjtfGbm6PF-gNDUoF-KTu-RJoAX25k4',
             URL_LER_ENCOMENDAS: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c77f5fdeb5704193aa1180062b45aad9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2Eub1i-QYw4yW0Jfyp4gvTxgChXKapj9JIyzNeiIUe8',
             URL_LER_TERMINADAS: 'https://defaultcade90c14fe343a3860494c20418f8.fb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/42efb5db25d64c65a609d7c1e9640000/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=eTIEcPyCSQdnarEuPjqaBQ4gWyt8tWkAkzki1BSNffc'
         };
@@ -851,14 +852,19 @@
                     horaFim: formPert.horaFim, duracao
                 };
                 try {
-                    await fetch(CONFIG.URL_ESCREVER_CONFIG, {
+                    await fetch(CONFIG.URL_ADICIONAR_PERT, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ acao: 'adicionar', tabela: 'perturbacoes', dados: {
-                            'ID Registo': id, 'Data': modalDados.data, 'Colaborador': modalDados.colab,
-                            'Tipo Perturbação': formPert.tipo, 'Hora Início': formPert.horaInicio,
-                            'Hora Fim': formPert.horaFim, 'Duração': duracao
-                        }})
+                        body: JSON.stringify({
+                            IDRegisto: id,
+                            Data: modalDados.data,
+                            Colaborador: modalDados.colab,
+                            TipoPerturbacao: formPert.tipo,
+                            HoraInicio: formPert.horaInicio,
+                            HoraFim: formPert.horaFim,
+                            Duracao: duracao,
+                            DataHoraRegisto: new Date().toLocaleString('pt-PT')
+                        })
                     });
                 } catch(e) { console.log('Erro ao adicionar perturbação:', e); }
                 const novas = [...perturbacoes, novaPert];
@@ -899,9 +905,9 @@
                 alert('✅ Perturbação atualizada!');
             };
             const guardarMapaAuto = async (mes, registosData, forcar = false) => {
+                const guardados = JSON.parse(localStorage.getItem('adminMesesGuardados') || '[]');
                 // Se não forçar, verificar se já foi guardado
                 if (!forcar) {
-                    const guardados = JSON.parse(localStorage.getItem('adminMesesGuardados') || '[]');
                     if (guardados.includes(mes)) {
                         console.log('Mês', mes, 'já guardado, ignorando...');
                         return;
