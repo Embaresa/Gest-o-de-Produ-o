@@ -260,10 +260,7 @@
                 return ARTIGOS;
             });
 
-            const [operacoesConfig, setOperacoesConfig] = useState(() => {
-                const s = localStorage.getItem('adminOperacoesConfig');
-                return s ? JSON.parse(s) : OPERACOES.map(op => ({ operacao: op, unidade: 'Evora1-Montagem', artigos: '' }));
-            });
+            const [operacoesConfig, setOperacoesConfig] = useState([]);
 
             const TIPOS = getTipos(artigosConfig);
 
@@ -336,7 +333,6 @@
             useEffect(() => { localStorage.setItem('adminColabs', JSON.stringify(colaboradores)); }, [colaboradores]);
             useEffect(() => { localStorage.setItem('adminPins', JSON.stringify(pins)); }, [pins]);
             useEffect(() => { localStorage.setItem('adminArtigosConfig', JSON.stringify(artigosConfig)); }, [artigosConfig]);
-            useEffect(() => { localStorage.setItem('adminOperacoesConfig', JSON.stringify(operacoesConfig)); }, [operacoesConfig]);
             useEffect(() => { localStorage.setItem('adminAusencias', JSON.stringify(ausencias)); }, [ausencias]);
             useEffect(() => { localStorage.setItem('adminFerias', JSON.stringify(ferias)); }, [ferias]);
             useEffect(() => { localStorage.setItem('adminMesesGuardados', JSON.stringify(mesesGuardados)); }, [mesesGuardados]);
@@ -571,8 +567,9 @@
                                 artigos: o.Artigos || o.artigos || ''
                             })).filter(o => o.operacao);
                             console.log('Operações carregadas:', ops.length);
+                            console.log('DEBUG ops Logistica:', ops.filter(o => o.artigos.includes('Logistica')).map(o => o.operacao));
+                            console.log('DEBUG ops E1-Frac:', ops.filter(o => o.operacao.includes('E1-Frac')).map(o => ({ op: o.operacao, artigos: o.artigos })));
                             setOperacoesConfig(ops);
-                            localStorage.setItem('adminOperacoesConfig', JSON.stringify(ops));
                         }
                         
                         // Ausências
@@ -2293,11 +2290,11 @@
                                                                         <div style={{ marginBottom: '6px' }}>
                                                                             <label style={{ fontSize: '10px', color: '#64748b' }}>Artigo</label>
                                                                             <select className="input" value={formCruz.artigo || ''} onChange={e => {
-                                                                                const art = ARTIGOS.find(a => a.artigo === e.target.value);
+                                                                                const art = artigosConfig.find(a => a.artigo === e.target.value);
                                                                                 setFormCruz({...formCruz, artigo: e.target.value, tipoCaixa: art?.tipo || formCruz.tipoCaixa});
                                                                             }} style={{ padding: '6px', fontSize: '12px' }}>
                                                                                 <option value="">Selecionar...</option>
-                                                                                {ARTIGOS.map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
+                                                                                {artigosConfig.map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
                                                                             </select>
                                                                         </div>
                                                                         <div style={{ marginBottom: '6px' }}>
@@ -2456,18 +2453,25 @@
                                                             <div style={{ marginBottom: '8px' }}>
                                                                 <label style={{ fontSize: '11px', color: '#64748b' }}>Artigo</label>
                                                                 <select className="input" value={formEdit.artigo || ''} onChange={e => {
-                                                                    const art = ARTIGOS.find(a => a.artigo === e.target.value);
+                                                                    const art = artigosConfig.find(a => a.artigo === e.target.value);
                                                                     setFormEdit({...formEdit, artigo: e.target.value, tipoCaixa: art?.tipo || formEdit.tipoCaixa});
                                                                 }} style={{ padding: '8px', fontSize: '12px' }}>
                                                                     <option value="">Selecionar artigo...</option>
-                                                                    {ARTIGOS.filter(a => !formEdit.tipoCaixa || a.tipo === formEdit.tipoCaixa).map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
+                                                                    {artigosConfig.filter(a => !formEdit.tipoCaixa || a.tipo === formEdit.tipoCaixa).map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
                                                                 </select>
                                                             </div>
                                                             <div style={{ marginBottom: '8px' }}>
                                                                 <label style={{ fontSize: '11px', color: '#64748b' }}>Operação</label>
-                                                                <select className="input" value={formEdit.operacao || ''} onChange={e => setFormEdit({...formEdit, operacao: e.target.value})} style={{ padding: '8px', fontSize: '12px' }}>
+                                                                <select className="input" value={formEdit.operacao || ''} onChange={e => {
+                                                                    const opSel = operacoesConfig.find(op => op.operacao === e.target.value);
+                                                                    setFormEdit({...formEdit, operacao: e.target.value, unidade: opSel?.unidade || formEdit.unidade});
+                                                                }} style={{ padding: '8px', fontSize: '12px' }}>
                                                                     <option value="">Selecionar operação...</option>
-                                                                    {OPERACOES.map(op => <option key={op} value={op}>{op}</option>)}
+                                                                    {operacoesConfig.filter(op => {
+                                                                        if (!formEdit.artigo) return true;
+                                                                        if (!op.artigos) return false;
+                                                                        return op.artigos.split(',').map(a => a.trim()).includes(formEdit.artigo);
+                                                                    }).map(op => <option key={op.operacao} value={op.operacao}>{op.operacao}</option>)}
                                                                 </select>
                                                             </div>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -2530,28 +2534,32 @@
                                             <div style={{ marginBottom: '8px' }}>
                                                 <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Artigo</label>
                                                 <select className="input" value={formNovo.artigo || ''} onChange={e => {
-                                                    const art = ARTIGOS.find(a => a.artigo === e.target.value);
+                                                    const art = artigosConfig.find(a => a.artigo === e.target.value);
                                                     setFormNovo({...formNovo, artigo: e.target.value, tipoCaixa: art?.tipo || formNovo.tipoCaixa});
                                                 }} style={{ padding: '8px', fontSize: '12px' }}>
                                                     <option value="">Selecionar artigo...</option>
-                                                    {ARTIGOS.filter(a => !formNovo.tipoCaixa || a.tipo === formNovo.tipoCaixa).map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
+                                                    {artigosConfig.filter(a => !formNovo.tipoCaixa || a.tipo === formNovo.tipoCaixa).map(a => <option key={a.artigo} value={a.artigo}>{a.artigo}</option>)}
                                                 </select>
                                             </div>
                                             <div style={{ marginBottom: '8px' }}>
                                                 <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Operação</label>
-                                                <select className="input" value={formNovo.operacao || ''} onChange={e => setFormNovo({...formNovo, operacao: e.target.value})} style={{ padding: '8px', fontSize: '12px' }}>
+                                                <select className="input" value={formNovo.operacao || ''} onChange={e => {
+                                                    const opSel = operacoesConfig.find(op => op.operacao === e.target.value);
+                                                    setFormNovo({...formNovo, operacao: e.target.value, unidade: opSel?.unidade || formNovo.unidade});
+                                                }} style={{ padding: '8px', fontSize: '12px' }}>
                                                     <option value="">Selecionar operação...</option>
-                                                    {operacoesConfig.filter(op => !formNovo.artigo || !op.artigos || op.artigos.includes(formNovo.artigo)).map(op => <option key={op.operacao} value={op.operacao}>{op.operacao}</option>)}
+                                                    {operacoesConfig.filter(op => {
+                                                        if (!formNovo.artigo) return true;
+                                                        if (!op.artigos) return false;
+                                                        return op.artigos.split(',').map(a => a.trim()).includes(formNovo.artigo);
+                                                    }).map(op => <option key={op.operacao} value={op.operacao}>{op.operacao}</option>)}
                                                 </select>
                                             </div>
                                             <div style={{ marginBottom: '8px' }}>
                                                 <label style={{ fontSize: '11px', color: '#a7f3d0' }}>Unidade Produção</label>
                                                 <select className="input" value={formNovo.unidade || ''} onChange={e => setFormNovo({...formNovo, unidade: e.target.value})} style={{ padding: '8px', fontSize: '12px' }}>
                                                     <option value="">Selecionar unidade...</option>
-                                                    <option value="Evora1-Montagem">Evora1-Montagem</option>
-                                                    <option value="Evora1-Soldadura">Evora1-Soldadura</option>
-                                                    <option value="Evora1-Embalamento">Evora1-Embalamento</option>
-                                                    <option value="Transportes">Transportes</option>
+                                                    {[...new Set(operacoesConfig.map(op => op.unidade).filter(Boolean))].sort().map(u => <option key={u} value={u}>{u}</option>)}
                                                 </select>
                                             </div>
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
